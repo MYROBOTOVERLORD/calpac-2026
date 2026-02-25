@@ -46,10 +46,10 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen bg-zinc-900 text-white flex items-center justify-center">
-      <div className="bg-zinc-800 p-8 rounded-2xl shadow-xl w-80 text-center">
+    <main className="min-h-screen bg-sky-50 text-slate-900 flex items-center justify-center">
+      <div className="bg-white/80 border border-sky-200 p-8 rounded-2xl shadow-xl w-80 text-center">
         <h1 className="text-3xl font-bold mb-2">Calpac Golf</h1>
-        <p className="text-zinc-400 mb-6">Enter Foursome PIN</p>
+        <p className="text-slate-600 mb-6">Enter Foursome PIN</p>
 
         <input
           value={pin}
@@ -57,7 +57,7 @@ export default function Home() {
           onKeyDown={(e) => {
             if (e.key === "Enter") onEnter();
           }}
-          className="w-full p-3 text-center text-xl tracking-widest bg-zinc-900 border border-zinc-700 rounded-lg mb-4"
+          className="w-full p-3 text-center text-xl tracking-widest bg-white border border-sky-300 rounded-lg mb-4 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-400"
           placeholder="1234"
           maxLength={6}
           inputMode="numeric"
@@ -67,14 +67,14 @@ export default function Home() {
         <button
           onClick={onEnter}
           disabled={loading}
-          className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 p-3 rounded-lg font-semibold"
+          className="w-full bg-sky-600 hover:bg-sky-700 disabled:opacity-60 p-3 rounded-lg font-semibold text-white"
         >
           {loading ? "Checking..." : "Enter"}
         </button>
 
         {error ? <p className="text-sm text-red-300 mt-3">{error}</p> : null}
 
-        <p className="text-xs text-zinc-500 mt-4">
+        <p className="text-xs text-slate-500 mt-4">
           Ask your group captain for the PIN
         </p>
       </div>

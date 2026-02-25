@@ -836,50 +836,50 @@ export default function GroupAdminPage() {
 		}
 	}
 
-	if (loading) return <main className="min-h-screen bg-zinc-900 text-white p-6">Loading…</main>;
-	if (error) return <main className="min-h-screen bg-zinc-900 text-white p-6">{error}</main>;
-	if (!group) return <main className="min-h-screen bg-zinc-900 text-white p-6">Missing group.</main>;
+	if (loading) return <main className="min-h-screen bg-sky-50 text-slate-900 p-6">Loading…</main>;
+	if (error) return <main className="min-h-screen bg-sky-50 text-slate-900 p-6">{error}</main>;
+	if (!group) return <main className="min-h-screen bg-sky-50 text-slate-900 p-6">Missing group.</main>;
 
 	return (
-		<main className="min-h-screen bg-zinc-900 text-white p-6">
+		<main className="min-h-screen bg-sky-50 text-slate-900 p-6">
 			<div className="max-w-5xl mx-auto">
 				<div className="flex items-start justify-between gap-4">
 					<div>
 						<h1 className="text-2xl font-bold">{title} · Admin</h1>
-						<p className="text-zinc-400 mt-1">{saving ? "Saving…" : "Saved"}</p>
+						<p className="text-slate-600 mt-1">{saving ? "Saving…" : "Saved"}</p>
 					</div>
 					<div className="flex flex-wrap gap-2 justify-end">
 						<button
 							onClick={() => router.push("/")}
-							className="bg-zinc-900 hover:bg-zinc-700 border border-zinc-700 px-4 py-2 rounded-lg text-sm"
+							className="bg-white hover:bg-sky-50 border border-sky-200 px-4 py-2 rounded-lg text-sm"
 						>
 							Back to PIN login
 						</button>
 						<button
 							onClick={() => router.push(`/group/${groupId}`)}
-							className="bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 px-4 py-2 rounded-lg text-sm"
+							className="bg-white hover:bg-sky-50 border border-sky-200 px-4 py-2 rounded-lg text-sm"
 						>
 							Back to scoring
 						</button>
 					</div>
 				</div>
 
-				<div className="mt-6 bg-zinc-800 border border-zinc-700 rounded-2xl p-5">
+				<div className="mt-6 bg-white/80 border border-sky-200 rounded-2xl p-5">
 					<div className="flex items-center justify-between gap-3 flex-wrap">
 						<h2 className="text-lg font-semibold">Admin login</h2>
 						{isAdmin ? (
-							<p className="text-sm text-zinc-300">Signed in: {adminUser?.email ?? "(unknown)"}</p>
+							<p className="text-sm text-slate-700">Signed in: {adminUser?.email ?? "(unknown)"}</p>
 						) : isSignedIn ? (
-							<p className="text-sm text-amber-200">Signed in but not authorized</p>
+							<p className="text-sm text-amber-700">Signed in but not authorized</p>
 						) : (
-							<p className="text-sm text-zinc-400">Sign in to edit players/handicaps/scores</p>
+							<p className="text-sm text-slate-600">Sign in to edit players/handicaps/scores</p>
 						)}
 					</div>
 
 					{isSignedIn ? (
 						<button
 							onClick={adminLogout}
-							className="mt-3 bg-zinc-900 hover:bg-zinc-700 border border-zinc-700 px-4 py-2 rounded-lg text-sm"
+							className="mt-3 bg-white hover:bg-sky-50 border border-sky-200 px-4 py-2 rounded-lg text-sm"
 						>
 							Sign out
 						</button>
@@ -888,7 +888,7 @@ export default function GroupAdminPage() {
 							<input
 								value={adminEmail}
 								onChange={(e) => setAdminEmail(e.target.value)}
-								className="p-2 bg-zinc-900 border border-zinc-700 rounded-lg"
+								className="p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
 								placeholder="Admin email"
 								autoComplete="username"
 							/>
@@ -896,40 +896,40 @@ export default function GroupAdminPage() {
 								value={adminPassword}
 								onChange={(e) => setAdminPassword(e.target.value)}
 								type="password"
-								className="p-2 bg-zinc-900 border border-zinc-700 rounded-lg"
+								className="p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
 								placeholder="Password"
 								autoComplete="current-password"
 							/>
 							<button
 								onClick={adminLogin}
-								className="bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-lg font-semibold"
+								className="bg-sky-600 hover:bg-sky-500 px-4 py-2 rounded-lg font-semibold text-white"
 							>
 								Sign in
 							</button>
 						</div>
 					)}
 
-					{adminError ? <p className="text-sm text-red-300 mt-3">{adminError}</p> : null}
+					{adminError ? <p className="text-sm text-red-600 mt-3">{adminError}</p> : null}
 				</div>
 
 				{isAdmin ? (
 					<>
-						<div className="mt-6 bg-zinc-800 border border-zinc-700 rounded-2xl p-5">
+						<div className="mt-6 bg-white/80 border border-sky-200 rounded-2xl p-5">
 							<div className="flex items-center justify-between gap-3 flex-wrap">
 								<h2 className="text-lg font-semibold">All players (all foursomes)</h2>
 								{allGroupsLoading ? (
-									<p className="text-sm text-zinc-400">Loading…</p>
+									<p className="text-sm text-slate-600">Loading…</p>
 								) : (
-									<p className="text-sm text-zinc-400">{allGroups.length} groups</p>
+									<p className="text-sm text-slate-600">{allGroups.length} groups</p>
 								)}
 							</div>
-							<p className="text-zinc-400 text-sm mt-1">Edit handicaps/tees/charity here. You can also move a player to a different foursome.</p>
-							{allGroupsError ? <p className="text-sm text-red-300 mt-2">{allGroupsError}</p> : null}
+							<p className="text-slate-600 text-sm mt-1">Edit handicaps/tees/charity here. You can also move a player to a different foursome.</p>
+							{allGroupsError ? <p className="text-sm text-red-600 mt-2">{allGroupsError}</p> : null}
 
 							<div className="mt-3 overflow-x-auto">
 								<table className="w-full min-w-[1180px] text-sm">
 									<thead>
-										<tr className="text-left text-zinc-300">
+										<tr className="text-left text-slate-700">
 											<th className="p-2 min-w-[220px]">Player</th>
 											<th className="p-2 pr-1 min-w-[92px]">Foursome</th>
 												<th className="p-2 pl-1 min-w-[70px]">PIN</th>
@@ -959,7 +959,7 @@ export default function GroupAdminPage() {
 													const teeDay2 = edit?.teeDay2 ?? ((g.data.teeChoices?.day2?.[player] as TeeKey | null | undefined) ?? "stampede");
 													const isRowSaving = savingPlayerKey === key;
 													return (
-														<tr key={key} className="border-t border-zinc-800">
+															<tr key={key} className="border-t border-sky-100">
 															<td className="p-2 min-w-[220px]">
 																<input
 																	value={edit?.name ?? player}
@@ -969,7 +969,7 @@ export default function GroupAdminPage() {
 																			[key]: { ...(prev[key] ?? {}), name: e.target.value },
 																		}))
 																	}
-																	className="w-[20ch] max-w-[20ch] p-2 bg-zinc-900 border border-zinc-700 rounded-lg"
+																		className="w-[20ch] max-w-[20ch] p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
 																	placeholder="Player"
 																/>
 															</td>
@@ -982,7 +982,7 @@ export default function GroupAdminPage() {
 																				[key]: { ...(prev[key] ?? {}), moveToGid: e.target.value },
 																			}))
 																		}
-																		className="w-16 p-2 bg-zinc-900 border border-zinc-700 rounded-lg"
+																		className="w-16 p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
 																	>
 																		{foursomeOptions.map((opt) => (
 																			<option key={opt.gid} value={opt.gid}>
@@ -991,7 +991,7 @@ export default function GroupAdminPage() {
 																		))}
 																	</select>
 																</td>
-																		<td className="p-2 pl-1 text-zinc-300">{gPin || "-"}</td>
+																		<td className="p-2 pl-1 text-slate-700">{gPin || "-"}</td>
 															<td className="p-2">
 																<input
 																	value={handicap}
@@ -1002,7 +1002,7 @@ export default function GroupAdminPage() {
 																		}))
 																}
 																	inputMode="numeric"
-																	className="w-16 p-2 bg-zinc-900 border border-zinc-700 rounded-lg text-center"
+																		className="w-16 p-2 bg-white border border-sky-200 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-sky-200"
 																/>
 															</td>
 															<td className="p-2">
@@ -1015,7 +1015,7 @@ export default function GroupAdminPage() {
 																		}))
 																}
 																	inputMode="numeric"
-																	className="w-16 p-2 bg-zinc-900 border border-zinc-700 rounded-lg text-center"
+																		className="w-16 p-2 bg-white border border-sky-200 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-sky-200"
 																/>
 															</td>
 															<td className="p-2">
@@ -1027,7 +1027,7 @@ export default function GroupAdminPage() {
 																			[key]: { ...(prev[key] ?? {}), teeDay1: e.target.value as TeeKey },
 																		}))
 																}
-																	className="p-2 bg-zinc-900 border border-zinc-700 rounded-lg"
+																		className="p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
 																>
 																				<option value="combo">2 Trees</option>
 																	<option value="three">3 Trees (+1)</option>
@@ -1043,7 +1043,7 @@ export default function GroupAdminPage() {
 																			[key]: { ...(prev[key] ?? {}), teeDay2: e.target.value as TeeKey },
 																		}))
 																}
-																	className="p-2 bg-zinc-900 border border-zinc-700 rounded-lg"
+																		className="p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
 																>
 																	<option value="stampede">Stampede</option>
 																	<option value="tips">Tips</option>
@@ -1059,7 +1059,7 @@ export default function GroupAdminPage() {
 																		}))
 																}
 																	inputMode="numeric"
-																	className="w-16 p-2 bg-zinc-900 border border-zinc-700 rounded-lg text-center"
+																		className="w-16 p-2 bg-white border border-sky-200 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-sky-200"
 																/>
 															</td>
 																		<td className="p-2">
@@ -1072,27 +1072,27 @@ export default function GroupAdminPage() {
 																			}))
 																		}
 																		inputMode="numeric"
-																			className="w-16 p-2 bg-zinc-900 border border-zinc-700 rounded-lg text-center"
+																			className="w-16 p-2 bg-white border border-sky-200 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-sky-200"
 																		/>
 																		</td>
 															<td className="p-2 whitespace-nowrap">
 																<div className="flex gap-2">
 																	<button
 																		onClick={() => router.push(`/group/${g.id}/admin`)}
-																		className="bg-zinc-900 hover:bg-zinc-700 border border-zinc-700 px-3 py-2 rounded-lg text-sm"
+																			className="bg-white hover:bg-sky-50 border border-sky-200 px-3 py-2 rounded-lg text-sm"
 																	>
 																		Open
 																	</button>
 																	<button
 																		onClick={() => deletePlayerFromGroup({ gid: g.id, player })}
-																		className="bg-zinc-900 hover:bg-zinc-700 border border-zinc-700 px-3 py-2 rounded-lg text-sm"
+																			className="bg-white hover:bg-sky-50 border border-sky-200 px-3 py-2 rounded-lg text-sm"
 																	>
 																		Delete
 																	</button>
 																	<button
 																		onClick={() => savePlayerEdits({ gid: g.id, player })}
 																		disabled={isRowSaving}
-																		className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 px-3 py-2 rounded-lg font-semibold"
+																			className="bg-sky-600 hover:bg-sky-500 disabled:opacity-60 px-3 py-2 rounded-lg font-semibold text-white"
 																	>
 																		{isRowSaving ? "Saving…" : "Save"}
 																	</button>
@@ -1107,40 +1107,40 @@ export default function GroupAdminPage() {
 									</table>
 							</div>
 
-							<div className="mt-4 border-t border-zinc-700 pt-4">
-								<h3 className="text-sm font-semibold text-zinc-200">Add player</h3>
+							<div className="mt-4 border-t border-sky-200 pt-4">
+								<h3 className="text-sm font-semibold text-slate-900">Add player</h3>
 								<div className="mt-3 grid grid-cols-1 lg:grid-cols-6 gap-2">
 									<input
 										value={addPlayerName}
 										onChange={(e) => setAddPlayerName(e.target.value)}
-										className="p-2 bg-zinc-900 border border-zinc-700 rounded-lg lg:col-span-2 w-[20ch] max-w-full"
+										className="p-2 bg-white border border-sky-200 rounded-lg lg:col-span-2 w-[20ch] max-w-full focus:outline-none focus:ring-2 focus:ring-sky-200"
 										placeholder="Player name"
 									/>
 									<input
 										value={addPlayerFoursome}
 										onChange={(e) => setAddPlayerFoursome(e.target.value)}
 										inputMode="numeric"
-										className="p-2 bg-zinc-900 border border-zinc-700 rounded-lg w-16"
+										className="p-2 bg-white border border-sky-200 rounded-lg w-16 focus:outline-none focus:ring-2 focus:ring-sky-200"
 										placeholder="Foursome #"
 									/>
 									<input
 										value={addPlayerHandicap}
 										onChange={(e) => setAddPlayerHandicap(e.target.value)}
 										inputMode="numeric"
-										className="p-2 bg-zinc-900 border border-zinc-700 rounded-lg"
+										className="p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
 										placeholder="Hndcp"
 									/>
 									<input
 										value={addPlayerDay2Adj}
 										onChange={(e) => setAddPlayerDay2Adj(e.target.value)}
 										inputMode="numeric"
-										className="p-2 bg-zinc-900 border border-zinc-700 rounded-lg"
+										className="p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
 										placeholder="D2 Adj"
 									/>
 									<select
 										value={addPlayerTeeDay1}
 										onChange={(e) => setAddPlayerTeeDay1(e.target.value as TeeKey)}
-										className="p-2 bg-zinc-900 border border-zinc-700 rounded-lg"
+										className="p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
 									>
 										<option value="combo">Day 1: 2 Trees</option>
 										<option value="three">Day 1: 3 Trees</option>
@@ -1149,7 +1149,7 @@ export default function GroupAdminPage() {
 									<select
 										value={addPlayerTeeDay2}
 										onChange={(e) => setAddPlayerTeeDay2(e.target.value as TeeKey)}
-										className="p-2 bg-zinc-900 border border-zinc-700 rounded-lg"
+										className="p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
 									>
 										<option value="stampede">Day 2: Stampede</option>
 										<option value="tips">Day 2: Tips</option>
@@ -1158,14 +1158,14 @@ export default function GroupAdminPage() {
 										value={addPlayerCharity}
 										onChange={(e) => setAddPlayerCharity(e.target.value)}
 										inputMode="numeric"
-										className="p-2 bg-zinc-900 border border-zinc-700 rounded-lg"
+										className="p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
 										placeholder="Char"
 									/>
 									<input
 										value={addPlayerTree}
 										onChange={(e) => setAddPlayerTree(e.target.value)}
 										inputMode="numeric"
-										className="p-2 bg-zinc-900 border border-zinc-700 rounded-lg"
+										className="p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
 										placeholder="Tree"
 									/>
 								</div>
@@ -1173,140 +1173,140 @@ export default function GroupAdminPage() {
 									<button
 										onClick={addPlayerToFoursome}
 										disabled={addingPlayer}
-										className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 px-4 py-2 rounded-lg font-semibold"
+										className="bg-sky-600 hover:bg-sky-500 disabled:opacity-60 px-4 py-2 rounded-lg font-semibold text-white"
 									>
 										{addingPlayer ? "Adding…" : "Add player"}
 									</button>
-									{addPlayerError ? <p className="text-sm text-red-300">{addPlayerError}</p> : null}
+									{addPlayerError ? <p className="text-sm text-red-600">{addPlayerError}</p> : null}
 								</div>
 							</div>
 						</div>
 
-							<div className="mt-6 bg-zinc-800 border border-zinc-700 rounded-2xl p-5">
+							<div className="mt-6 bg-white/80 border border-sky-200 rounded-2xl p-5">
 								<h2 className="text-lg font-semibold">Create a new foursome</h2>
-								<p className="text-zinc-400 text-sm mt-1">Creates a new group (separate doc) so you don’t overwrite this one.</p>
+								<p className="text-slate-600 text-sm mt-1">Creates a new group (separate doc) so you don’t overwrite this one.</p>
 								<div className="mt-3 grid grid-cols-1 gap-2">
 									<input
 										value={newFoursomeNumberDraft}
 										onChange={(e) => setNewFoursomeNumberDraft(e.target.value)}
 										inputMode="numeric"
-										className="p-2 bg-zinc-900 border border-zinc-700 rounded-lg"
+										className="p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
 										placeholder="Foursome # (e.g. 2)"
 									/>
 									<input
 										value={newPinDraft}
 										onChange={(e) => setNewPinDraft(e.target.value)}
-										className="p-2 bg-zinc-900 border border-zinc-700 rounded-lg"
+										className="p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
 										placeholder="PIN (required)"
 									/>
 									<textarea
 										value={newPlayersDraft}
 										onChange={(e) => setNewPlayersDraft(e.target.value)}
 										rows={3}
-										className="p-3 bg-zinc-900 border border-zinc-700 rounded-lg"
+										className="p-3 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
 										placeholder="Players (comma or newline separated)"
 									/>
 									<div className="flex flex-wrap gap-2">
 										<button
 											onClick={() => createNewGroup(false)}
 											disabled={creatingGroup}
-											className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 px-4 py-2 rounded-lg font-semibold"
+											className="bg-sky-600 hover:bg-sky-500 disabled:opacity-60 px-4 py-2 rounded-lg font-semibold text-white"
 										>
 											{creatingGroup ? "Creating…" : "Create group"}
 										</button>
 										<button
 											onClick={() => createNewGroup(true)}
 											disabled={creatingGroup}
-											className="bg-zinc-900 hover:bg-zinc-700 border border-zinc-700 disabled:opacity-60 px-4 py-2 rounded-lg text-sm"
+											className="bg-white hover:bg-sky-50 border border-sky-200 disabled:opacity-60 px-4 py-2 rounded-lg text-sm"
 										>
 											Create & open admin
 										</button>
 									</div>
-									{createGroupError ? <p className="text-sm text-red-300 mt-2">{createGroupError}</p> : null}
+									{createGroupError ? <p className="text-sm text-red-600 mt-2">{createGroupError}</p> : null}
 									{createdGroupId ? (
-										<p className="text-sm text-emerald-300 mt-2">
+										<p className="text-sm text-sky-700 mt-2">
 											Created: <a className="underline" href={`/group/${createdGroupId}`}>/group/{createdGroupId}</a>
 										</p>
 									) : null}
 								</div>
 							</div>
 
-						<div className="mt-6 bg-zinc-800 border border-zinc-700 rounded-2xl p-5">
+							<div className="mt-6 bg-white/80 border border-sky-200 rounded-2xl p-5">
 							<h2 className="text-lg font-semibold">Course scorecards (Pars)</h2>
-							<p className="text-zinc-400 text-sm mt-1">Enter 18 numbers per day (comma separated). Used to track Closest-to-Pin on every Par 3.</p>
+								<p className="text-slate-600 text-sm mt-1">Enter 18 numbers per day (comma separated). Used to track Closest-to-Pin on every Par 3.</p>
 							<div className="mt-3 grid grid-cols-1 gap-3">
 								<div>
-									<p className="text-sm text-zinc-300">Day 1 pars</p>
+										<p className="text-sm text-slate-700">Day 1 pars</p>
 									<input
 										value={day1ParsDraft}
 										onChange={(e) => setDay1ParsDraft(e.target.value)}
-										className="mt-1 w-full p-2 bg-zinc-900 border border-zinc-700 rounded-lg"
+											className="mt-1 w-full p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
 										placeholder="4,5,3,4,4,5,3,4,4,4,5,3,4,4,5,3,4,4"
 									/>
 								</div>
 								<div>
-									<p className="text-sm text-zinc-300">Day 2 pars</p>
+										<p className="text-sm text-slate-700">Day 2 pars</p>
 									<input
 										value={day2ParsDraft}
 										onChange={(e) => setDay2ParsDraft(e.target.value)}
-										className="mt-1 w-full p-2 bg-zinc-900 border border-zinc-700 rounded-lg"
+											className="mt-1 w-full p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
 										placeholder="4,4,3,5,4,4,3,4,5,4,4,3,5,4,4,3,4,5"
 									/>
 								</div>
 								<div>
-									<p className="text-sm text-zinc-300">Day 1 HCP (stroke index)</p>
+										<p className="text-sm text-slate-700">Day 1 HCP (stroke index)</p>
 									<input
 										value={day1HcpsDraft}
 										onChange={(e) => setDay1HcpsDraft(e.target.value)}
-										className="mt-1 w-full p-2 bg-zinc-900 border border-zinc-700 rounded-lg"
+											className="mt-1 w-full p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
 										placeholder="7,1,13,11,5,3,15,17,9,2,16,6,8,4,12,18,14,10"
 									/>
 								</div>
 								<div>
-									<p className="text-sm text-zinc-300">Day 2 HCP (stroke index)</p>
+										<p className="text-sm text-slate-700">Day 2 HCP (stroke index)</p>
 									<input
 										value={day2HcpsDraft}
 										onChange={(e) => setDay2HcpsDraft(e.target.value)}
-										className="mt-1 w-full p-2 bg-zinc-900 border border-zinc-700 rounded-lg"
+											className="mt-1 w-full p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
 										placeholder="7,1,13,11,5,3,15,17,9,2,16,6,8,4,12,18,14,10"
 									/>
 								</div>
 							</div>
 							<button
 								onClick={saveScorecards}
-								className="mt-3 bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-lg font-semibold"
+									className="mt-3 bg-sky-600 hover:bg-sky-500 px-4 py-2 rounded-lg font-semibold text-white"
 							>
 								Save scorecards
 							</button>
-							{scorecardError ? <p className="text-sm text-red-300 mt-3">{scorecardError}</p> : null}
+								{scorecardError ? <p className="text-sm text-red-600 mt-3">{scorecardError}</p> : null}
 						</div>
 
-						<div className="mt-6 bg-zinc-800 border border-zinc-700 rounded-2xl p-5">
+							<div className="mt-6 bg-white/80 border border-sky-200 rounded-2xl p-5">
 							<div className="flex items-center justify-between gap-3 flex-wrap">
 								<h2 className="text-lg font-semibold">Score adjustments</h2>
-								<div className="inline-flex rounded-lg border border-zinc-700 overflow-hidden">
+									<div className="inline-flex rounded-lg border border-sky-200 overflow-hidden bg-white/70">
 									<button
 										onClick={() => setSelectedDay("day1")}
-										className={`px-4 py-2 text-sm ${selectedDay === "day1" ? "bg-emerald-600" : "bg-zinc-800 hover:bg-zinc-700"}`}
+											className={`px-4 py-2 text-sm ${selectedDay === "day1" ? "bg-sky-600 text-white" : "bg-white/60 hover:bg-white"}`}
 									>
 										Day 1
 									</button>
 									<button
 										onClick={() => setSelectedDay("day2")}
-										className={`px-4 py-2 text-sm ${selectedDay === "day2" ? "bg-emerald-600" : "bg-zinc-800 hover:bg-zinc-700"}`}
+											className={`px-4 py-2 text-sm ${selectedDay === "day2" ? "bg-sky-600 text-white" : "bg-white/60 hover:bg-white"}`}
 									>
 										Day 2
 									</button>
 								</div>
 							</div>
 
-							<div className="mt-3 overflow-x-auto bg-zinc-900 border border-zinc-700 rounded-xl">
+								<div className="mt-3 overflow-x-auto bg-white border border-sky-200 rounded-xl">
 								<table className="w-full min-w-[720px] text-sm">
-									<thead className="bg-zinc-900/60">
+										<thead className="bg-sky-100/70">
 										<tr className="text-left">
-											<th className="p-3 text-zinc-300">Hole</th>
+												<th className="p-3 text-slate-700">Hole</th>
 											{players.map((p) => (
-												<th key={p} className="p-3 text-zinc-300">
+													<th key={p} className="p-3 text-slate-700">
 													{p}
 												</th>
 											))}
@@ -1314,8 +1314,8 @@ export default function GroupAdminPage() {
 									</thead>
 									<tbody>
 										{Array.from({ length: HOLE_COUNT }, (_, holeIdx) => (
-											<tr key={holeIdx} className={holeIdx % 2 ? "bg-zinc-800" : "bg-zinc-800/60"}>
-												<td className="p-3 text-zinc-200 font-semibold">{holeIdx + 1}</td>
+												<tr key={holeIdx} className={holeIdx % 2 ? "bg-white/40" : "bg-white/70"}>
+													<td className="p-3 text-slate-800 font-semibold">{holeIdx + 1}</td>
 												{players.map((p) => {
 													const table = scoresByDay[selectedDay];
 													const v = table[p]?.[holeIdx];
@@ -1342,7 +1342,7 @@ export default function GroupAdminPage() {
 																}}
 																inputMode="numeric"
 																pattern="[0-9]*"
-																className="w-20 p-2 bg-zinc-900 border border-zinc-700 rounded-lg text-center"
+																className="w-20 p-2 bg-white border border-sky-200 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-sky-200"
 																placeholder="-"
 															/>
 														</td>

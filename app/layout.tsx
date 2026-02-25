@@ -26,9 +26,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased relative`}
       >
-        <div className="fixed top-3 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
           <Image
             src="/calp-logo.svg"
             alt="Cal-Pacific Golf Classic 38"

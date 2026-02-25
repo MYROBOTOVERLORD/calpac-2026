@@ -697,17 +697,17 @@ export default function GroupPage() {
 		});
 	}
 
-	if (loading) return <main className="min-h-screen bg-zinc-900 text-white p-3 sm:p-6">Loading...</main>;
-	if (error) return <main className="min-h-screen bg-zinc-900 text-white p-3 sm:p-6">{error}</main>;
-	if (!group) return <main className="min-h-screen bg-zinc-900 text-white p-3 sm:p-6">Missing group data.</main>;
+	if (loading) return <main className="min-h-screen bg-sky-50 text-slate-900 p-3 sm:p-6">Loading...</main>;
+	if (error) return <main className="min-h-screen bg-sky-50 text-slate-900 p-3 sm:p-6">{error}</main>;
+	if (!group) return <main className="min-h-screen bg-sky-50 text-slate-900 p-3 sm:p-6">Missing group data.</main>;
 
 	return (
-			<main className="min-h-screen bg-zinc-900 text-white p-3 sm:p-6">
-				<div className="max-w-5xl mx-auto">
+		<main className="min-h-screen bg-sky-50 text-slate-900 p-3 sm:p-6">
+			<div className="max-w-5xl mx-auto">
 					<div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4">
 						<div>
 							<h1 className="text-xl sm:text-2xl font-bold">{title}</h1>
-							<p className="text-zinc-400 mt-1">
+							<p className="text-slate-600 mt-1">
 								{players.length ? `${players.length} players` : "No players yet"} · {saving ? "Saving…" : "Saved"}
 							</p>
 						</div>
@@ -715,44 +715,44 @@ export default function GroupPage() {
 
 					{players.length ? (
 						<div className="mt-5 flex items-center justify-between gap-3 flex-wrap">
-							<div className="inline-flex rounded-lg border border-zinc-700 overflow-hidden">
+							<div className="inline-flex rounded-lg border border-sky-200 overflow-hidden bg-white/70">
 								<button
 									onClick={() => setSelectedDay("day1")}
-									className={`px-4 py-2 text-sm ${selectedDay === "day1" ? "bg-emerald-600" : "bg-zinc-800 hover:bg-zinc-700"}`}
+									className={`px-4 py-2 text-sm ${selectedDay === "day1" ? "bg-sky-600 text-white" : "bg-white/60 hover:bg-white"}`}
 								>
 									Day 1
 								</button>
 								<button
 									onClick={() => setSelectedDay("day2")}
-									className={`px-4 py-2 text-sm ${selectedDay === "day2" ? "bg-emerald-600" : "bg-zinc-800 hover:bg-zinc-700"}`}
+									className={`px-4 py-2 text-sm ${selectedDay === "day2" ? "bg-sky-600 text-white" : "bg-white/60 hover:bg-white"}`}
 								>
 									Day 2
 								</button>
 							</div>
-							<p className="text-sm text-zinc-300">Course: {courseName}</p>
+							<p className="text-sm text-slate-700">Course: {courseName}</p>
 						</div>
 					) : null}
 
 					{players.length === 0 ? (
-						<div className="mt-6 bg-zinc-800 border border-zinc-700 rounded-2xl p-5">
+						<div className="mt-6 bg-white/80 border border-sky-200 rounded-2xl p-5">
 							<h2 className="text-lg font-semibold">Players not set</h2>
-							<p className="text-zinc-400 text-sm mt-1">Ask an admin to set up players, handicaps, and adjustments.</p>
+							<p className="text-slate-600 text-sm mt-1">Ask an admin to set up players, handicaps, and adjustments.</p>
 							<button
 								onClick={() => router.push(`/group/${groupId}/admin`)}
-								className="mt-3 bg-zinc-900 hover:bg-zinc-700 border border-zinc-700 px-4 py-2 rounded-lg text-sm"
+								className="mt-3 bg-white hover:bg-sky-50 border border-sky-200 px-4 py-2 rounded-lg text-sm"
 							>
 								Open admin
 							</button>
 						</div>
 					) : (
 						<>
-							<div className="mt-4 sm:mt-6 overflow-x-auto bg-zinc-800 border border-zinc-700 rounded-2xl">
+							<div className="mt-4 sm:mt-6 overflow-x-auto bg-white/80 border border-sky-200 rounded-2xl">
 								<table className="w-full min-w-[720px] text-xs sm:text-sm">
-									<thead className="bg-zinc-900/60">
+									<thead className="bg-sky-100/70">
 										<tr className="text-left">
-											<th className="p-2 sm:p-3 text-zinc-300">Hole</th>
+											<th className="p-2 sm:p-3 text-slate-700">Hole</th>
 											{players.map((p) => (
-												<th key={p} className="p-2 sm:p-3 text-zinc-300">
+												<th key={p} className="p-2 sm:p-3 text-slate-700">
 													{p}
 												</th>
 											))}
@@ -760,11 +760,11 @@ export default function GroupPage() {
 									</thead>
 									<tbody>
 										{Array.from({ length: HOLE_COUNT }, (_, holeIdx) => (
-											<tr key={holeIdx} className={holeIdx % 2 ? "bg-zinc-800" : "bg-zinc-800/60"}>
-												<td className="p-2 sm:p-3 text-zinc-200 font-semibold whitespace-nowrap">
+											<tr key={holeIdx} className={holeIdx % 2 ? "bg-white/40" : "bg-white/70"}>
+												<td className="p-2 sm:p-3 text-slate-800 font-semibold whitespace-nowrap">
 													Hole {holeIdx + 1}
-													{dayPars ? <span className="text-zinc-500 font-normal"> · Par {dayPars[holeIdx]}</span> : null}
-													{dayHcps ? <span className="text-zinc-500 font-normal"> · Hcp {dayHcps[holeIdx]}</span> : null}
+													{dayPars ? <span className="text-slate-500 font-normal"> · Par {dayPars[holeIdx]}</span> : null}
+													{dayHcps ? <span className="text-slate-500 font-normal"> · Hcp {dayHcps[holeIdx]}</span> : null}
 												</td>
 												{players.map((p) => {
 													const v = scores[p]?.[holeIdx];
@@ -798,16 +798,16 @@ export default function GroupPage() {
 																}}
 																inputMode="numeric"
 																pattern="[0-9]*"
-																className="w-16 sm:w-20 p-2 bg-zinc-900 border border-zinc-700 rounded-lg text-center"
+																className="w-16 sm:w-20 p-2 bg-white border border-sky-200 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-sky-200"
 																placeholder="-"
 															/>
 															<div className="whitespace-nowrap">
-																<div className="text-[11px] sm:text-xs text-zinc-500">Net</div>
-																<div className="text-base sm:text-lg font-semibold text-zinc-200 leading-none">
+																<div className="text-[11px] sm:text-xs text-slate-500">Net</div>
+																<div className="text-base sm:text-lg font-semibold text-slate-900 leading-none">
 																	{netHole == null ? "—" : netHole}
 																</div>
 																{netHole != null && holeStroke ? (
-																	<div className="text-xs text-zinc-600">(−{holeStroke})</div>
+																	<div className="text-xs text-slate-500">(−{holeStroke})</div>
 																) : null}
 															</div>
 															</div>
@@ -816,39 +816,39 @@ export default function GroupPage() {
 												})}
 											</tr>
 										))}
-										<tr className="bg-zinc-900/60 border-t border-zinc-700">
-											<td className="p-2 sm:p-3 text-zinc-200 font-semibold">Total · Gross</td>
+											<tr className="bg-sky-100/70 border-t border-sky-200">
+												<td className="p-2 sm:p-3 text-slate-800 font-semibold">Total · Gross</td>
 											{players.map((p) => (
-												<td key={`gross-${p}`} className="p-2 sm:p-3 text-zinc-200 font-semibold">
+													<td key={`gross-${p}`} className="p-2 sm:p-3 text-slate-800 font-semibold">
 													{grossTotals[p] ?? 0}
 												</td>
 											))}
-											<td className="p-2 sm:p-3 text-zinc-200 font-semibold">{groupGrossTotal}</td>
+												<td className="p-2 sm:p-3 text-slate-800 font-semibold">{groupGrossTotal}</td>
 										</tr>
-										<tr className="bg-zinc-900/60 border-t border-zinc-800">
-											<td className="p-2 sm:p-3 text-zinc-200 font-semibold">Total · Net</td>
+											<tr className="bg-sky-100/70 border-t border-sky-200">
+												<td className="p-2 sm:p-3 text-slate-800 font-semibold">Total · Net</td>
 											{players.map((p) => (
-												<td key={`net-${p}`} className="p-2 sm:p-3 text-zinc-200 font-semibold">
+													<td key={`net-${p}`} className="p-2 sm:p-3 text-slate-800 font-semibold">
 													{netTotals[p] ?? 0}
 												</td>
 											))}
-											<td className="p-2 sm:p-3 text-zinc-200 font-semibold">{groupNetTotal}</td>
+												<td className="p-2 sm:p-3 text-slate-800 font-semibold">{groupNetTotal}</td>
 										</tr>
 									</tbody>
 								</table>
 							</div>
 
-							<div className="mt-4 sm:mt-6 bg-zinc-800 border border-zinc-700 rounded-2xl p-3 sm:p-5">
+							<div className="mt-4 sm:mt-6 bg-white/80 border border-sky-200 rounded-2xl p-3 sm:p-5">
 								<div className="flex items-center justify-between gap-3 flex-wrap">
 									<h2 className="text-lg font-semibold">Totals</h2>
-									<p className="text-zinc-300 text-sm">Group gross: {groupGrossTotal} · Group net: {groupNetTotal}</p>
+									<p className="text-slate-700 text-sm">Group gross: {groupGrossTotal} · Group net: {groupNetTotal}</p>
 								</div>
 
 								<div className="mt-2 sm:mt-3 grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 items-start">
-									<div className="bg-zinc-900 border border-zinc-700 rounded-xl p-2 sm:p-3 overflow-x-auto self-start">
+									<div className="bg-white border border-sky-200 rounded-xl p-2 sm:p-3 overflow-x-auto self-start">
 										<table className="w-full min-w-[560px] text-xs sm:text-sm">
 											<thead>
-												<tr className="text-left text-zinc-300">
+												<tr className="text-left text-slate-700">
 													<th className="p-1.5 sm:p-2">Player</th>
 													<th className="p-1.5 sm:p-2">Handicap</th>
 													{selectedDay === "day2" ? <th className="p-1.5 sm:p-2">Day 2 adj</th> : null}
@@ -858,39 +858,39 @@ export default function GroupPage() {
 											</thead>
 											<tbody>
 												{players.map((p) => (
-													<tr key={p} className="border-t border-zinc-800">
-														<td className="p-1.5 sm:p-2 text-zinc-200 font-semibold">{p}</td>
-														<td className="p-1.5 sm:p-2 text-zinc-200">{handicaps[p] ?? 0}</td>
-														{selectedDay === "day2" ? <td className="p-1.5 sm:p-2 text-zinc-200">{day2Adjustments[p] ?? 0}</td> : null}
-														<td className="p-1.5 sm:p-2 text-zinc-200">{grossTotals[p] ?? 0}</td>
-														<td className="p-1.5 sm:p-2 text-zinc-200">{netTotals[p] ?? 0}</td>
+													<tr key={p} className="border-t border-sky-100">
+														<td className="p-1.5 sm:p-2 text-slate-900 font-semibold">{p}</td>
+														<td className="p-1.5 sm:p-2 text-slate-800">{handicaps[p] ?? 0}</td>
+														{selectedDay === "day2" ? <td className="p-1.5 sm:p-2 text-slate-800">{day2Adjustments[p] ?? 0}</td> : null}
+														<td className="p-1.5 sm:p-2 text-slate-800">{grossTotals[p] ?? 0}</td>
+														<td className="p-1.5 sm:p-2 text-slate-800">{netTotals[p] ?? 0}</td>
 													</tr>
 												))}
 											</tbody>
 										</table>
-										<p className="text-xs text-zinc-500 mt-1 sm:mt-2">*Net includes tee bonus. Charity + Tree strokes apply to final score only.</p>
+										<p className="text-xs text-slate-500 mt-1 sm:mt-2">*Net includes tee bonus. Charity + Tree strokes apply to final score only.</p>
 									</div>
 
-									<div className="bg-zinc-900 border border-zinc-700 rounded-xl p-2 sm:p-3 self-start">
-										<h3 className="text-sm font-semibold text-zinc-200">Closest to the Pin</h3>
-										{par3Holes.length ? <p className="text-xs text-zinc-500 mt-1">Par 3 holes: {par3Holes.join(", ")}</p> : null}
+									<div className="bg-white border border-sky-200 rounded-xl p-2 sm:p-3 self-start">
+										<h3 className="text-sm font-semibold text-slate-900">Closest to the Pin</h3>
+										{par3Holes.length ? <p className="text-xs text-slate-500 mt-1">Par 3 holes: {par3Holes.join(", ")}</p> : null}
 										{par3Holes.length ? (
 											<div className="mt-2 space-y-2">
 												{par3Holes.map((hole) => {
 													const entry = contestByDay[selectedDay].closestToPinByHole[String(hole)] ?? { winner: "", note: "" };
 													return (
 														<div key={hole} className="grid grid-cols-1 sm:grid-cols-3 gap-1.5 sm:gap-2">
-															<div className="p-2 bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-200">Hole {hole} · Par 3</div>
+															<div className="p-2 bg-sky-50 border border-sky-200 rounded-lg text-slate-800">Hole {hole} · Par 3</div>
 															<input
 																value={entry.winner}
 																onChange={(e) => updateClosestToPinForHole(hole, "winner", e.target.value)}
-																className="p-1.5 sm:p-2 bg-zinc-800 border border-zinc-700 rounded-lg"
+																className="p-1.5 sm:p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
 																placeholder="Winner"
 															/>
 															<input
 																value={entry.note}
 																onChange={(e) => updateClosestToPinForHole(hole, "note", e.target.value)}
-																className="p-1.5 sm:p-2 bg-zinc-800 border border-zinc-700 rounded-lg"
+																className="p-1.5 sm:p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
 																placeholder="Distance"
 															/>
 														</div>
@@ -899,50 +899,50 @@ export default function GroupPage() {
 											</div>
 										) : (
 											<>
-												<p className="text-xs text-zinc-400 mt-1">Set course pars in Admin to enable Par 3 tracking.</p>
+												<p className="text-xs text-slate-600 mt-1">Set course pars in Admin to enable Par 3 tracking.</p>
 												<div className="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-1.5 sm:gap-2">
 													<input
 														value={contestByDay[selectedDay].legacyClosestToPin.hole}
 														onChange={(e) => updateLegacyClosestToPin("hole", e.target.value)}
 														inputMode="numeric"
-														className="p-1.5 sm:p-2 bg-zinc-800 border border-zinc-700 rounded-lg"
+															className="p-1.5 sm:p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
 														placeholder="Hole"
 													/>
 													<input
 														value={contestByDay[selectedDay].legacyClosestToPin.winner}
 														onChange={(e) => updateLegacyClosestToPin("winner", e.target.value)}
-														className="p-1.5 sm:p-2 bg-zinc-800 border border-zinc-700 rounded-lg"
+															className="p-1.5 sm:p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
 														placeholder="Winner"
 													/>
 													<input
 														value={contestByDay[selectedDay].legacyClosestToPin.note}
 														onChange={(e) => updateLegacyClosestToPin("note", e.target.value)}
-														className="p-1.5 sm:p-2 bg-zinc-800 border border-zinc-700 rounded-lg"
+															className="p-1.5 sm:p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
 														placeholder="Distance"
 													/>
 												</div>
 											</>
 										)}
 
-										<h3 className="text-sm font-semibold text-zinc-200 mt-3 sm:mt-4">Longest Drive</h3>
+										<h3 className="text-sm font-semibold text-slate-900 mt-3 sm:mt-4">Longest Drive</h3>
 										<div className="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-1.5 sm:gap-2">
 											<input
 												value={contestByDay[selectedDay].longestDrive.hole}
 												onChange={(e) => updateLongestDrive("hole", e.target.value)}
 												inputMode="numeric"
-												className="p-1.5 sm:p-2 bg-zinc-800 border border-zinc-700 rounded-lg"
+												className="p-1.5 sm:p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
 												placeholder="Hole"
 											/>
 											<input
 												value={contestByDay[selectedDay].longestDrive.winner}
 												onChange={(e) => updateLongestDrive("winner", e.target.value)}
-												className="p-1.5 sm:p-2 bg-zinc-800 border border-zinc-700 rounded-lg"
+												className="p-1.5 sm:p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
 												placeholder="Winner"
 											/>
 											<input
 												value={contestByDay[selectedDay].longestDrive.note}
 												onChange={(e) => updateLongestDrive("note", e.target.value)}
-												className="p-1.5 sm:p-2 bg-zinc-800 border border-zinc-700 rounded-lg"
+												className="p-1.5 sm:p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
 												placeholder="Distance"
 											/>
 										</div>
@@ -950,21 +950,21 @@ export default function GroupPage() {
 								</div>
 							</div>
 
-							<div className="mt-6 bg-zinc-800 border border-zinc-700 rounded-2xl p-4 sm:p-5">
+							<div className="mt-6 bg-white/80 border border-sky-200 rounded-2xl p-4 sm:p-5">
 								<div className="flex items-center justify-between gap-3 flex-wrap">
 									<h2 className="text-lg font-semibold">Leaderboards</h2>
-									<p className="text-sm text-zinc-400">Sorted by net (low)</p>
+									<p className="text-sm text-slate-600">Sorted by net (low)</p>
 								</div>
 
 								<div className="mt-3 grid grid-cols-1 lg:grid-cols-2 gap-4">
-									<div className="bg-zinc-900 border border-zinc-700 rounded-xl p-3 overflow-x-auto">
+									<div className="bg-white border border-sky-200 rounded-xl p-3 overflow-x-auto">
 										<div className="flex items-baseline justify-between gap-3">
-											<h3 className="text-sm font-semibold text-zinc-200">Day 1</h3>
-											<p className="text-xs text-zinc-500">{day1Course}</p>
+											<h3 className="text-sm font-semibold text-slate-900">Day 1</h3>
+											<p className="text-xs text-slate-500">{day1Course}</p>
 										</div>
 										<table className="w-full min-w-[520px] text-sm mt-2">
 											<thead>
-												<tr className="text-left text-zinc-300">
+												<tr className="text-left text-slate-700">
 													<th className="p-2">#</th>
 													<th className="p-2">Player</th>
 													<th className="p-2">HCP</th>
@@ -975,13 +975,13 @@ export default function GroupPage() {
 											</thead>
 											<tbody>
 												{day1Leaderboard.map((r, idx) => (
-													<tr key={`d1-${r.player}`} className="border-t border-zinc-800">
-														<td className="p-2 text-zinc-400">{idx + 1}</td>
-														<td className="p-2 text-zinc-200 font-semibold">{r.player}</td>
-														<td className="p-2 text-zinc-200">{r.handicap}</td>
-														<td className="p-2 text-zinc-200">{r.gross}</td>
-														<td className="p-2 text-zinc-200">{r.net}</td>
-														<td className="p-2 text-zinc-200">
+													<tr key={`d1-${r.player}`} className="border-t border-sky-100">
+														<td className="p-2 text-slate-500">{idx + 1}</td>
+														<td className="p-2 text-slate-900 font-semibold">{r.player}</td>
+														<td className="p-2 text-slate-800">{r.handicap}</td>
+														<td className="p-2 text-slate-800">{r.gross}</td>
+														<td className="p-2 text-slate-800">{r.net}</td>
+														<td className="p-2 text-slate-800">
 																	{r.toPar == null ? "—" : r.toPar === 0 ? "E" : r.toPar < 0 ? `${r.toPar}` : `+${r.toPar}`}
 														</td>
 													</tr>
@@ -990,14 +990,14 @@ export default function GroupPage() {
 										</table>
 									</div>
 
-									<div className="bg-zinc-900 border border-zinc-700 rounded-xl p-3 overflow-x-auto">
+									<div className="bg-white border border-sky-200 rounded-xl p-3 overflow-x-auto">
 										<div className="flex items-baseline justify-between gap-3">
-											<h3 className="text-sm font-semibold text-zinc-200">Day 2 (Final)</h3>
-											<p className="text-xs text-zinc-500">{day2Course} · includes adj</p>
+											<h3 className="text-sm font-semibold text-slate-900">Day 2 (Final)</h3>
+											<p className="text-xs text-slate-500">{day2Course} · includes adj</p>
 										</div>
 										<table className="w-full min-w-[620px] text-sm mt-2">
 											<thead>
-												<tr className="text-left text-zinc-300">
+												<tr className="text-left text-slate-700">
 													<th className="p-2">#</th>
 													<th className="p-2">Player</th>
 													<th className="p-2">HCP</th>
@@ -1009,14 +1009,14 @@ export default function GroupPage() {
 											</thead>
 											<tbody>
 												{day2Leaderboard.map((r, idx) => (
-													<tr key={`d2-${r.player}`} className="border-t border-zinc-800">
-														<td className="p-2 text-zinc-400">{idx + 1}</td>
-														<td className="p-2 text-zinc-200 font-semibold">{r.player}</td>
-														<td className="p-2 text-zinc-200">{r.handicap}</td>
-														<td className="p-2 text-zinc-200">{r.adjustment}</td>
-														<td className="p-2 text-zinc-200">{r.gross}</td>
-														<td className="p-2 text-zinc-200">{r.net}</td>
-														<td className="p-2 text-zinc-200">
+													<tr key={`d2-${r.player}`} className="border-t border-sky-100">
+														<td className="p-2 text-slate-500">{idx + 1}</td>
+														<td className="p-2 text-slate-900 font-semibold">{r.player}</td>
+														<td className="p-2 text-slate-800">{r.handicap}</td>
+														<td className="p-2 text-slate-800">{r.adjustment}</td>
+														<td className="p-2 text-slate-800">{r.gross}</td>
+														<td className="p-2 text-slate-800">{r.net}</td>
+														<td className="p-2 text-slate-800">
 																	{r.toPar == null ? "—" : r.toPar === 0 ? "E" : r.toPar < 0 ? `${r.toPar}` : `+${r.toPar}`}
 														</td>
 													</tr>
@@ -1027,14 +1027,14 @@ export default function GroupPage() {
 								</div>
 							</div>
 
-							<div className="mt-6 bg-zinc-800 border border-zinc-700 rounded-2xl p-4 sm:p-5">
+							<div className="mt-6 bg-white/80 border border-sky-200 rounded-2xl p-4 sm:p-5">
 								<div className="flex items-center justify-between gap-3 flex-wrap">
 									<h2 className="text-lg font-semibold">Admin</h2>
-									<p className="text-sm text-zinc-400">Handicaps, adjustments, players, score edits</p>
+									<p className="text-sm text-slate-600">Handicaps, adjustments, players, score edits</p>
 								</div>
 								<button
 									onClick={() => router.push(`/group/${groupId}/admin`)}
-									className="mt-3 bg-zinc-900 hover:bg-zinc-700 border border-zinc-700 px-4 py-2 rounded-lg text-sm"
+									className="mt-3 bg-white hover:bg-sky-50 border border-sky-200 px-4 py-2 rounded-lg text-sm"
 								>
 									Open admin
 								</button>
