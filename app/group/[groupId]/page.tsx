@@ -858,9 +858,9 @@ export default function GroupPage() {
 								<table className="w-full min-w-[720px] text-xs sm:text-sm">
 									<thead className="bg-sky-100/70">
 										<tr className="text-left">
-											<th className="p-2 sm:p-3 text-slate-700">Hole</th>
+											<th className="p-1.5 sm:p-3 text-slate-700">Hole</th>
 											{players.map((p) => (
-												<th key={p} className="p-2 sm:p-3 text-slate-700">
+												<th key={p} className="p-1.5 sm:p-3 text-slate-700 whitespace-nowrap">
 													{p}
 												</th>
 											))}
@@ -869,10 +869,21 @@ export default function GroupPage() {
 									<tbody>
 										{Array.from({ length: HOLE_COUNT }, (_, holeIdx) => (
 											<tr key={holeIdx} className={holeIdx % 2 ? "bg-white/40" : "bg-white/70"}>
-												<td className="p-2 sm:p-3 text-slate-800 font-semibold whitespace-nowrap">
-													Hole {holeIdx + 1}
-													{dayPars ? <span className="text-slate-500 font-normal"> · Par {dayPars[holeIdx]}</span> : null}
-													{dayHcps ? <span className="text-slate-500 font-normal"> · Hcp {dayHcps[holeIdx]}</span> : null}
+												<td className="p-1.5 sm:p-3 text-slate-800 font-semibold whitespace-nowrap">
+													<div className="sm:hidden">
+														<div>Hole {holeIdx + 1}</div>
+														{dayPars || dayHcps ? (
+															<div className="text-slate-500 font-normal leading-tight mt-0.5">
+																{dayPars ? <div>Par {dayPars[holeIdx]}</div> : null}
+																{dayHcps ? <div>Hcp {dayHcps[holeIdx]}</div> : null}
+															</div>
+														) : null}
+													</div>
+													<div className="hidden sm:block">
+														Hole {holeIdx + 1}
+														{dayPars ? <span className="text-slate-500 font-normal"> · Par {dayPars[holeIdx]}</span> : null}
+														{dayHcps ? <span className="text-slate-500 font-normal"> · Hcp {dayHcps[holeIdx]}</span> : null}
+													</div>
 												</td>
 												{players.map((p) => {
 													const v = scores[p]?.[holeIdx];
@@ -883,7 +894,7 @@ export default function GroupPage() {
 													const holeStroke = dayHcps ? strokesForHole(dayHcps[holeIdx], totalStrokes) : 0;
 													const netHole = typeof v === "number" && Number.isFinite(v) ? v - holeStroke : null;
 													return (
-														<td key={`${p}-${holeIdx}`} className="p-2 sm:p-3">
+														<td key={`${p}-${holeIdx}`} className="p-1.5 sm:p-3">
 															<div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
 																<input
 																	disabled={isDay1LockedView}
@@ -908,7 +919,7 @@ export default function GroupPage() {
 																	}}
 																	inputMode="numeric"
 																	pattern="[0-9]*"
-																	className={`w-16 sm:w-20 p-2 border rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-sky-200 ${
+																	className={`w-14 sm:w-20 p-1.5 sm:p-2 border rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-sky-200 ${
 																		isDay1LockedView
 																			? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed"
 																			: "bg-white border-sky-200"
