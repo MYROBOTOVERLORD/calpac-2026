@@ -282,6 +282,44 @@ function normalizeClosestToPinByHoleState(
 	return out;
 }
 
+function parseFeetInches(note: string) {
+	const raw = (note ?? "").trim();
+	if (!raw) return { feet: "", inches: "" };
+
+	// Common patterns:
+	// - 3' 7"
+	// - 3 ft 7 in
+	// - 3 7
+	// - 3-7
+	const apostropheMatch = raw.match(/(\d+)\s*'\s*(\d+)?\s*(?:\"|in|inch|inches)?/i);
+	if (apostropheMatch) {
+		return { feet: apostropheMatch[1] ?? "", inches: apostropheMatch[2] ?? "" };
+	}
+	const ftInMatch = raw.match(/(\d+)\s*(?:ft|feet)\s*(\d+)?\s*(?:in|inch|inches)?/i);
+	if (ftInMatch) {
+		return { feet: ftInMatch[1] ?? "", inches: ftInMatch[2] ?? "" };
+	}
+	const nums = raw.match(/\d+/g) ?? [];
+	if (nums.length >= 2) return { feet: nums[0] ?? "", inches: nums[1] ?? "" };
+	if (nums.length === 1) return { feet: nums[0] ?? "", inches: "" };
+	return { feet: "", inches: "" };
+}
+
+function formatFeetInches(feetRaw: string, inchesRaw: string) {
+	const feetTrim = feetRaw.trim();
+	const inchesTrim = inchesRaw.trim();
+	if (!feetTrim && !inchesTrim) return "";
+
+	const feetNum = feetTrim ? Math.max(0, Math.floor(Number(feetTrim))) : 0;
+	const inchesNum = inchesTrim ? Math.max(0, Math.floor(Number(inchesTrim))) : 0;
+	if (!Number.isFinite(feetNum) || !Number.isFinite(inchesNum)) return "";
+
+	const totalInches = feetNum * 12 + inchesNum;
+	const normFeet = Math.floor(totalInches / 12);
+	const normInches = totalInches % 12;
+	return `${normFeet}' ${normInches}"`;
+}
+
 function coerceClosestToPinByHoleFromDoc(input?: {
 	closestToPinByHole?: Record<string, ContestWinnerNote>;
 	closestToPin?: ContestEntry;
@@ -352,6 +390,7 @@ export default function GroupPage() {
 	});
 	const [saving, setSaving] = useState(false);
 	const saveTimerRef = useRef<number | null>(null);
+	const ctpPropagateTimerRef = useRef<number | null>(null);
 
 	const title = group?.groupName ?? group?.groupname ?? "Foursome";
 	const playersDay1 = useMemo(() => {
@@ -440,22 +479,6 @@ export default function GroupPage() {
 		}
 		return out;
 	}, [charityStrokes, day2Adjustments, dayHcps, dayPars, handicaps, players, scores, selectedDay, teeChoicesByDay, treeStrokes]);
-	const groupGrossTotal = useMemo(
-		() => players.reduce((acc, p) => acc + (grossTotals[p] ?? 0), 0),
-		[players, grossTotals]
-	);
-	const groupNetTotal = useMemo(
-		() => players.reduce((acc, p) => acc + (netTotals[p] ?? 0), 0),
-		[players, netTotals]
-	);
-	const groupCharityTotal = useMemo(
-		() => players.reduce((acc, p) => acc + (charityStrokes[p] ?? 0), 0),
-		[players, charityStrokes]
-	);
-	const groupTreeTotal = useMemo(
-		() => players.reduce((acc, p) => acc + (treeStrokes[p] ?? 0), 0),
-		[players, treeStrokes]
-	);
 
 	const day1Course = group?.tournament?.day1Course ?? "Old Greenwood";
 	type LeaderRow = {
@@ -655,6 +678,40 @@ export default function GroupPage() {
 		}, 400);
 	}
 
+	function scheduleClosestToPinPropagate(opts: { holeKey: string; entry: { winner: string; note: string } }) {
+		if (!group) return;
+		const normalized = normalizeWinnerNote(opts.entry);
+		// Only propagate once a distance has been posted.
+		if (normalized.note == null) return;
+
+		const tournamentId = group.tournamentId?.trim();
+		// Safety: without a tournament scope, do not broadcast updates across all groups.
+		if (!tournamentId) return;
+
+		if (ctpPropagateTimerRef.current) window.clearTimeout(ctpPropagateTimerRef.current);
+		ctpPropagateTimerRef.current = window.setTimeout(async () => {
+			try {
+				const groupsQ = query(collection(db, "groups"), where("tournamentId", "==", tournamentId));
+				const snap = await getDocs(groupsQ);
+				await Promise.all(
+					snap.docs.map((d) => {
+						const ref = doc(db, "groups", d.id);
+						return updateDoc(ref, {
+							[`contest.${selectedDay}.closestToPinByHole.${opts.holeKey}`]: {
+								winner: normalized.winner,
+								note: normalized.note,
+							},
+							updatedAt: serverTimestamp(),
+						});
+					})
+				);
+			} catch (err) {
+				const message = err instanceof Error ? err.message : String(err);
+				setError(`Could not propagate Closest-to-Pin: ${message}`);
+			}
+		}, 700);
+	}
+
 	function updateLongestDrive(field: "hole" | "winner" | "note", value: string) {
 		setContestByDay((prev) => {
 			const next = {
@@ -737,6 +794,9 @@ export default function GroupPage() {
 				},
 			};
 			scheduleSave({ contest: contestPatch });
+
+			const nextEntry = next[selectedDay].closestToPinByHole[holeKey] ?? { winner: "", note: "" };
+			scheduleClosestToPinPropagate({ holeKey, entry: nextEntry });
 
 			return next;
 		});
@@ -877,7 +937,6 @@ export default function GroupPage() {
 																			{grossTotals[p] ?? 0}
 																		</td>
 																))}
-																<td className="p-2 sm:p-3 text-slate-800 font-semibold">{groupGrossTotal}</td>
 														</tr>
 															<tr className="bg-sky-100/70 border-t border-sky-200">
 																<td className="p-2 sm:p-3 text-slate-800 font-semibold">Charity / Tree</td>
@@ -886,9 +945,6 @@ export default function GroupPage() {
 																			Ch {charityStrokes[p] ?? 0} · Tr {treeStrokes[p] ?? 0}
 																		</td>
 																))}
-																<td className="p-2 sm:p-3 text-slate-800 font-semibold whitespace-nowrap">
-																	Ch {groupCharityTotal} · Tr {groupTreeTotal}
-																</td>
 														</tr>
 											<tr className="bg-sky-100/70 border-t border-sky-200">
 												<td className="p-2 sm:p-3 text-slate-800 font-semibold">Total · Net</td>
@@ -897,7 +953,6 @@ export default function GroupPage() {
 													{netTotals[p] ?? 0}
 												</td>
 											))}
-												<td className="p-2 sm:p-3 text-slate-800 font-semibold">{groupNetTotal}</td>
 										</tr>
 									</tbody>
 								</table>
@@ -906,7 +961,6 @@ export default function GroupPage() {
 							<div className="mt-4 sm:mt-6 bg-white/80 border border-sky-200 rounded-2xl p-3 sm:p-5">
 								<div className="flex items-center justify-between gap-3 flex-wrap">
 									<h2 className="text-lg font-semibold">Totals</h2>
-									<p className="text-slate-700 text-sm">Group gross: {groupGrossTotal} · Group net: {groupNetTotal}</p>
 								</div>
 
 								<div className="mt-2 sm:mt-3 grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 items-start">
@@ -943,6 +997,7 @@ export default function GroupPage() {
 											<div className="mt-2 space-y-2">
 												{par3Holes.map((hole) => {
 													const entry = contestByDay[selectedDay].closestToPinByHole[String(hole)] ?? { winner: "", note: "" };
+													const distance = parseFeetInches(entry.note);
 													return (
 														<div key={hole} className="grid grid-cols-1 sm:grid-cols-3 gap-1.5 sm:gap-2">
 															<div className="p-2 bg-sky-50 border border-sky-200 rounded-lg text-slate-800">Hole {hole} · Par 3</div>
@@ -952,12 +1007,22 @@ export default function GroupPage() {
 																className="p-1.5 sm:p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
 																placeholder="Winner"
 															/>
-															<input
-																value={entry.note}
-																onChange={(e) => updateClosestToPinForHole(hole, "note", e.target.value)}
-																className="p-1.5 sm:p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
-																placeholder="Distance"
-															/>
+															<div className="grid grid-cols-2 gap-1.5 sm:gap-2">
+																<input
+																	value={distance.feet}
+																	onChange={(e) => updateClosestToPinForHole(hole, "note", formatFeetInches(e.target.value, distance.inches))}
+																	inputMode="numeric"
+																	className="p-1.5 sm:p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
+																	placeholder="Feet"
+																/>
+																<input
+																	value={distance.inches}
+																	onChange={(e) => updateClosestToPinForHole(hole, "note", formatFeetInches(distance.feet, e.target.value))}
+																	inputMode="numeric"
+																	className="p-1.5 sm:p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
+																	placeholder="Inches"
+																/>
+															</div>
 														</div>
 													);
 												})}
@@ -979,12 +1044,29 @@ export default function GroupPage() {
 															className="p-1.5 sm:p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
 														placeholder="Winner"
 													/>
-													<input
-														value={contestByDay[selectedDay].legacyClosestToPin.note}
-														onChange={(e) => updateLegacyClosestToPin("note", e.target.value)}
-															className="p-1.5 sm:p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
-														placeholder="Distance"
-													/>
+															<div className="grid grid-cols-2 gap-1.5 sm:gap-2">
+																{(() => {
+																	const d = parseFeetInches(contestByDay[selectedDay].legacyClosestToPin.note);
+																	return (
+																		<>
+																			<input
+																				value={d.feet}
+																				onChange={(e) => updateLegacyClosestToPin("note", formatFeetInches(e.target.value, d.inches))}
+																				inputMode="numeric"
+																				className="p-1.5 sm:p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
+																				placeholder="Feet"
+																			/>
+																			<input
+																				value={d.inches}
+																				onChange={(e) => updateLegacyClosestToPin("note", formatFeetInches(d.feet, e.target.value))}
+																				inputMode="numeric"
+																				className="p-1.5 sm:p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
+																				placeholder="Inches"
+																			/>
+																		</>
+																	);
+																})()}
+															</div>
 												</div>
 											</>
 										)}
