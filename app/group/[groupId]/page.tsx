@@ -391,6 +391,7 @@ export default function GroupPage() {
 	const [saving, setSaving] = useState(false);
 	const saveTimerRef = useRef<number | null>(null);
 	const ctpPropagateTimerRef = useRef<number | null>(null);
+	const longestDrivePropagateTimerRef = useRef<number | null>(null);
 
 	const title = group?.groupName ?? group?.groupname ?? "Foursome";
 	const playersDay1 = useMemo(() => {
@@ -712,6 +713,39 @@ export default function GroupPage() {
 		}, 700);
 	}
 
+	function scheduleLongestDrivePropagate(winner: string) {
+		if (!group) return;
+		const tournamentId = group.tournamentId?.trim();
+		if (!tournamentId) return;
+
+		const normalizedWinner = winner.trim();
+		if (!normalizedWinner) return;
+
+		if (longestDrivePropagateTimerRef.current) window.clearTimeout(longestDrivePropagateTimerRef.current);
+		longestDrivePropagateTimerRef.current = window.setTimeout(async () => {
+			try {
+				const groupsQ = query(collection(db, "groups"), where("tournamentId", "==", tournamentId));
+				const snap = await getDocs(groupsQ);
+				await Promise.all(
+					snap.docs.map((d) => {
+						const ref = doc(db, "groups", d.id);
+						return updateDoc(ref, {
+							[`contest.${selectedDay}.longestDrive`]: {
+								hole: null,
+								winner: normalizedWinner,
+								note: null,
+							},
+							updatedAt: serverTimestamp(),
+						});
+					})
+				);
+			} catch (err) {
+				const message = err instanceof Error ? err.message : String(err);
+				setError(`Could not propagate Longest Drive: ${message}`);
+			}
+		}, 700);
+	}
+
 	function updateLongestDrive(field: "hole" | "winner" | "note", value: string) {
 		setContestByDay((prev) => {
 			const next = {
@@ -735,6 +769,10 @@ export default function GroupPage() {
 				},
 			};
 			scheduleSave({ contest: contestPatch });
+
+			if (field === "winner") {
+				scheduleLongestDrivePropagate(value);
+			}
 
 			return next;
 		});
@@ -1083,25 +1121,12 @@ export default function GroupPage() {
 										)}
 
 										<h3 className="text-sm font-semibold text-slate-900 mt-3 sm:mt-4">Longest Drive</h3>
-										<div className="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-1.5 sm:gap-2">
-											<input
-												value={contestByDay[selectedDay].longestDrive.hole}
-												onChange={(e) => updateLongestDrive("hole", e.target.value)}
-												inputMode="numeric"
-												className="p-1.5 sm:p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
-												placeholder="Hole"
-											/>
+										<div className="mt-2">
 											<input
 												value={contestByDay[selectedDay].longestDrive.winner}
 												onChange={(e) => updateLongestDrive("winner", e.target.value)}
-												className="p-1.5 sm:p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
-												placeholder="Winner"
-											/>
-											<input
-												value={contestByDay[selectedDay].longestDrive.note}
-												onChange={(e) => updateLongestDrive("note", e.target.value)}
-												className="p-1.5 sm:p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
-												placeholder="Distance"
+												className="w-full p-1.5 sm:p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
+												placeholder="Winner name"
 											/>
 										</div>
 									</div>
