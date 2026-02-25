@@ -37,6 +37,10 @@ type GroupDoc = {
 	tournamentId?: string;
 	pin?: string;
 	playerNames?: string[];
+	playerNamesByDay?: {
+		day1?: string[];
+		day2?: string[];
+	};
 	// Back-compat: old format was { [player]: (number|null)[] }
 	scores?:
 		| Record<string, Array<number | null>>
@@ -50,6 +54,7 @@ type GroupDoc = {
 		day1?: Record<string, TeeKey | null>;
 		day2?: Record<string, TeeKey | null>;
 	};
+	day1ScoresLocked?: boolean;
 	charityStrokes?: Record<string, number | null>;
 	treeStrokes?: Record<string, number | null>;
 	contest?: {
@@ -78,6 +83,20 @@ type GroupDoc = {
 };
 
 const HOLE_COUNT = 18;
+
+function uniqPreserveOrder(values: string[]) {
+	const out: string[] = [];
+	const seen = new Set<string>();
+	for (const v of values) {
+		const key = v.trim();
+		if (!key) continue;
+		const lowered = key.toLowerCase();
+		if (seen.has(lowered)) continue;
+		seen.add(lowered);
+		out.push(key);
+	}
+	return out;
+}
 
 function coerceScoreTable(players: string[], input?: Record<string, Array<number | null>> | null) {
 	const next: Record<string, Array<number | null>> = {};
@@ -335,12 +354,27 @@ export default function GroupPage() {
 	const saveTimerRef = useRef<number | null>(null);
 
 	const title = group?.groupName ?? group?.groupname ?? "Foursome";
-	const players = useMemo(() => (group?.playerNames ?? []).filter(Boolean), [group?.playerNames]);
+	const playersDay1 = useMemo(() => {
+		const fromByDay = group?.playerNamesByDay?.day1;
+		const legacy = group?.playerNames;
+		const base = (Array.isArray(fromByDay) ? fromByDay : Array.isArray(legacy) ? legacy : []) as string[];
+		return base.filter(Boolean);
+	}, [group?.playerNames, group?.playerNamesByDay?.day1]);
+	const playersDay2 = useMemo(() => {
+		const fromByDay = group?.playerNamesByDay?.day2;
+		const legacy = group?.playerNames;
+		const base = (Array.isArray(fromByDay) ? fromByDay : Array.isArray(legacy) ? legacy : []) as string[];
+		return base.filter(Boolean);
+	}, [group?.playerNames, group?.playerNamesByDay?.day2]);
+	const players = useMemo(() => {
+		return selectedDay === "day1" ? playersDay1 : playersDay2;
+	}, [playersDay1, playersDay2, selectedDay]);
 	const courseName = useMemo(() => {
 		const d1 = group?.tournament?.day1Course ?? "Old Greenwood";
 		const d2 = group?.tournament?.day2Course ?? "Grays Crossing";
 		return selectedDay === "day1" ? d1 : d2;
 	}, [group?.tournament?.day1Course, group?.tournament?.day2Course, selectedDay]);
+	const isDay1LockedView = selectedDay === "day1" && !!group?.day1ScoresLocked;
 
 	const dayPars = useMemo(() => {
 		const pars = selectedDay === "day1" ? group?.tournament?.day1Pars : group?.tournament?.day2Pars;
@@ -414,6 +448,14 @@ export default function GroupPage() {
 		() => players.reduce((acc, p) => acc + (netTotals[p] ?? 0), 0),
 		[players, netTotals]
 	);
+	const groupCharityTotal = useMemo(
+		() => players.reduce((acc, p) => acc + (charityStrokes[p] ?? 0), 0),
+		[players, charityStrokes]
+	);
+	const groupTreeTotal = useMemo(
+		() => players.reduce((acc, p) => acc + (treeStrokes[p] ?? 0), 0),
+		[players, treeStrokes]
+	);
 
 	const day1Course = group?.tournament?.day1Course ?? "Old Greenwood";
 	type LeaderRow = {
@@ -427,7 +469,7 @@ export default function GroupPage() {
 	const day1Leaderboard = useMemo(() => {
 		const pars = group?.tournament?.day1Pars;
 		const hcps = group?.tournament?.day1Hcps;
-		const rows: LeaderRow[] = players.map((p) => {
+		const rows: LeaderRow[] = playersDay1.map((p) => {
 			const gross = sum(scoresByDay.day1[p] ?? []);
 			const handicap = handicaps[p] ?? 0;
 			const teeBonus = teeBonusForDay("day1", teeChoicesByDay.day1?.[p]);
@@ -455,13 +497,13 @@ export default function GroupPage() {
 		});
 		rows.sort((a, b) => a.net - b.net || a.gross - b.gross || a.player.localeCompare(b.player));
 		return rows;
-	}, [charityStrokes, group?.tournament?.day1Hcps, group?.tournament?.day1Pars, handicaps, players, scoresByDay.day1, teeChoicesByDay.day1, treeStrokes]);
+	}, [charityStrokes, group?.tournament?.day1Hcps, group?.tournament?.day1Pars, handicaps, playersDay1, scoresByDay.day1, teeChoicesByDay.day1, treeStrokes]);
 
 	const day2Course = group?.tournament?.day2Course ?? "Grays Crossing";
 	const day2Leaderboard = useMemo(() => {
 		const pars = group?.tournament?.day2Pars;
 		const hcps = group?.tournament?.day2Hcps;
-		const rows: LeaderRow[] = players.map((p) => {
+		const rows: LeaderRow[] = playersDay2.map((p) => {
 			const gross = sum(scoresByDay.day2[p] ?? []);
 			const handicap = handicaps[p] ?? 0;
 			const adjustment = day2Adjustments[p] ?? 0;
@@ -490,7 +532,7 @@ export default function GroupPage() {
 		});
 		rows.sort((a, b) => a.net - b.net || a.gross - b.gross || a.player.localeCompare(b.player));
 		return rows;
-	}, [charityStrokes, day2Adjustments, group?.tournament?.day2Hcps, group?.tournament?.day2Pars, handicaps, players, scoresByDay.day2, teeChoicesByDay.day2, treeStrokes]);
+	}, [charityStrokes, day2Adjustments, group?.tournament?.day2Hcps, group?.tournament?.day2Pars, handicaps, playersDay2, scoresByDay.day2, teeChoicesByDay.day2, treeStrokes]);
 
 	useEffect(() => {
 		(async () => {
@@ -538,16 +580,19 @@ export default function GroupPage() {
 						if (!snap.exists()) return;
 						const data = snap.data() as GroupDoc;
 						setGroup(data);
-						const nextPlayers = (data.playerNames ?? []).filter(Boolean);
-						setScoresByDay(coerceScoresByDay(nextPlayers, data.scores));
-						setHandicaps(coerceNumberMap(nextPlayers, data.handicaps ?? null, 0));
-						setDay2Adjustments(coerceNumberMap(nextPlayers, data.day2HandicapAdjustments ?? null, 0));
+						const legacy = (data.playerNames ?? []).filter(Boolean);
+						const d1 = ((data.playerNamesByDay?.day1 ?? legacy) as string[]).filter(Boolean);
+						const d2 = ((data.playerNamesByDay?.day2 ?? legacy) as string[]).filter(Boolean);
+						const allPlayers = uniqPreserveOrder([...d1, ...d2]);
+						setScoresByDay(coerceScoresByDay(allPlayers, data.scores));
+						setHandicaps(coerceNumberMap(allPlayers, data.handicaps ?? null, 0));
+						setDay2Adjustments(coerceNumberMap(allPlayers, data.day2HandicapAdjustments ?? null, 0));
 						setTeeChoicesByDay({
-							day1: coerceTeeMap(nextPlayers, data.teeChoices?.day1 ?? null, "combo"),
-							day2: coerceTeeMap(nextPlayers, data.teeChoices?.day2 ?? null, "combo"),
+							day1: coerceTeeMap(allPlayers, data.teeChoices?.day1 ?? null, "combo"),
+							day2: coerceTeeMap(allPlayers, data.teeChoices?.day2 ?? null, "combo"),
 						});
-						setCharityStrokes(coerceNumberMap(nextPlayers, data.charityStrokes ?? null, 0));
-						setTreeStrokes(coerceNumberMap(nextPlayers, data.treeStrokes ?? null, 0));
+						setCharityStrokes(coerceNumberMap(allPlayers, data.charityStrokes ?? null, 0));
+						setTreeStrokes(coerceNumberMap(allPlayers, data.treeStrokes ?? null, 0));
 						setContestByDay({
 							day1: {
 								closestToPinByHole: coerceClosestToPinByHoleFromDoc(data.contest?.day1),
@@ -729,7 +774,10 @@ export default function GroupPage() {
 									Day 2
 								</button>
 							</div>
-							<p className="text-sm text-slate-700">Course: {courseName}</p>
+							<div className="text-sm text-slate-700">
+								<p>Course: {courseName}</p>
+								{isDay1LockedView ? <p className="text-xs text-slate-600 mt-0.5">Day 1 locked by admin.</p> : null}
+							</div>
 						</div>
 					) : null}
 
@@ -778,29 +826,35 @@ export default function GroupPage() {
 														<td key={`${p}-${holeIdx}`} className="p-2 sm:p-3">
 															<div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
 																<input
+																	disabled={isDay1LockedView}
 																	value={typeof v === "number" ? String(v) : ""}
 																	onChange={(e) => {
-																	const raw = e.target.value;
-																	const parsed = raw === "" ? null : Number(raw);
-																	const nextScoresTable = {
-																		...scores,
-																		[p]: Array.from({ length: HOLE_COUNT }, (_, i) => scores[p]?.[i] ?? null),
-																	};
-																	nextScoresTable[p][holeIdx] =
-																		typeof parsed === "number" && Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+																		if (isDay1LockedView) return;
+																		const raw = e.target.value;
+																		const parsed = raw === "" ? null : Number(raw);
+																		const nextScoresTable = {
+																			...scores,
+																			[p]: Array.from({ length: HOLE_COUNT }, (_, i) => scores[p]?.[i] ?? null),
+																		};
+																		nextScoresTable[p][holeIdx] =
+																			typeof parsed === "number" && Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
 
-																	const nextScoresByDay = {
-																		...scoresByDay,
-																		[selectedDay]: nextScoresTable,
-																	};
-																	setScoresByDay(nextScoresByDay);
-																	scheduleSave({ scores: nextScoresByDay });
-																}}
-																inputMode="numeric"
-																pattern="[0-9]*"
-																className="w-16 sm:w-20 p-2 bg-white border border-sky-200 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-sky-200"
-																placeholder="-"
-															/>
+																		const nextScoresByDay = {
+																			...scoresByDay,
+																			[selectedDay]: nextScoresTable,
+																		};
+																		setScoresByDay(nextScoresByDay);
+																		scheduleSave({ scores: nextScoresByDay });
+																	}}
+																	inputMode="numeric"
+																	pattern="[0-9]*"
+																	className={`w-16 sm:w-20 p-2 border rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-sky-200 ${
+																		isDay1LockedView
+																			? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed"
+																			: "bg-white border-sky-200"
+																	}`}
+																	placeholder="-"
+																/>
 															<div className="whitespace-nowrap">
 																<div className="text-[11px] sm:text-xs text-slate-500">Net</div>
 																<div className="text-base sm:text-lg font-semibold text-slate-900 leading-none">
@@ -816,15 +870,26 @@ export default function GroupPage() {
 												})}
 											</tr>
 										))}
-											<tr className="bg-sky-100/70 border-t border-sky-200">
-												<td className="p-2 sm:p-3 text-slate-800 font-semibold">Total · Gross</td>
-											{players.map((p) => (
-													<td key={`gross-${p}`} className="p-2 sm:p-3 text-slate-800 font-semibold">
-													{grossTotals[p] ?? 0}
-												</td>
-											))}
-												<td className="p-2 sm:p-3 text-slate-800 font-semibold">{groupGrossTotal}</td>
-										</tr>
+															<tr className="bg-sky-100/70 border-t border-sky-200">
+																<td className="p-2 sm:p-3 text-slate-800 font-semibold">Total · Gross</td>
+																{players.map((p) => (
+																		<td key={`gross-${p}`} className="p-2 sm:p-3 text-slate-800 font-semibold">
+																			{grossTotals[p] ?? 0}
+																		</td>
+																))}
+																<td className="p-2 sm:p-3 text-slate-800 font-semibold">{groupGrossTotal}</td>
+														</tr>
+															<tr className="bg-sky-100/70 border-t border-sky-200">
+																<td className="p-2 sm:p-3 text-slate-800 font-semibold">Charity / Tree</td>
+																{players.map((p) => (
+																		<td key={`ct-${p}`} className="p-2 sm:p-3 text-slate-800 font-semibold whitespace-nowrap">
+																			Ch {charityStrokes[p] ?? 0} · Tr {treeStrokes[p] ?? 0}
+																		</td>
+																))}
+																<td className="p-2 sm:p-3 text-slate-800 font-semibold whitespace-nowrap">
+																	Ch {groupCharityTotal} · Tr {groupTreeTotal}
+																</td>
+														</tr>
 											<tr className="bg-sky-100/70 border-t border-sky-200">
 												<td className="p-2 sm:p-3 text-slate-800 font-semibold">Total · Net</td>
 											{players.map((p) => (

@@ -24,6 +24,11 @@ type GroupDoc = {
 	groupname?: string;
 	pin?: string;
 	playerNames?: string[];
+	playerNamesByDay?: {
+		day1?: string[];
+		day2?: string[];
+	};
+	day1ScoresLocked?: boolean;
 	scores?:
 		| Record<string, Array<number | null>>
 		| {
@@ -165,6 +170,8 @@ export default function GroupAdminPage() {
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const [group, setGroup] = useState<GroupDoc | null>(null);
+	const [day1LockSaving, setDay1LockSaving] = useState(false);
+	const [day1LockError, setDay1LockError] = useState<string | null>(null);
 
 	const [adminUser, setAdminUser] = useState<User | null>(null);
 	const [adminEmail, setAdminEmail] = useState("");
@@ -187,7 +194,18 @@ export default function GroupAdminPage() {
 	}, [adminUser, allowedAdminEmails]);
 
 	const title = group?.groupName ?? group?.groupname ?? "Foursome";
-	const players = useMemo(() => (group?.playerNames ?? []).filter(Boolean), [group?.playerNames]);
+	const [selectedDay, setSelectedDay] = useState<DayKey>("day1");
+	const playersDay1 = useMemo(() => {
+		const legacy = (group?.playerNames ?? []).filter(Boolean);
+		const d1 = (group?.playerNamesByDay?.day1 ?? legacy) as string[];
+		return d1.filter(Boolean);
+	}, [group?.playerNames, group?.playerNamesByDay?.day1]);
+	const playersDay2 = useMemo(() => {
+		const legacy = (group?.playerNames ?? []).filter(Boolean);
+		const d2 = (group?.playerNamesByDay?.day2 ?? legacy) as string[];
+		return d2.filter(Boolean);
+	}, [group?.playerNames, group?.playerNamesByDay?.day2]);
+	const players = useMemo(() => (selectedDay === "day1" ? playersDay1 : playersDay2), [playersDay1, playersDay2, selectedDay]);
 	const [newFoursomeNumberDraft, setNewFoursomeNumberDraft] = useState("");
 	const [newPinDraft, setNewPinDraft] = useState("");
 	const [newPlayersDraft, setNewPlayersDraft] = useState("");
@@ -195,7 +213,6 @@ export default function GroupAdminPage() {
 	const [creatingGroup, setCreatingGroup] = useState(false);
 	const [createdGroupId, setCreatedGroupId] = useState<string | null>(null);
 
-	const [selectedDay, setSelectedDay] = useState<DayKey>("day1");
 	const [day1ParsDraft, setDay1ParsDraft] = useState("");
 	const [day2ParsDraft, setDay2ParsDraft] = useState("");
 	const [day1HcpsDraft, setDay1HcpsDraft] = useState("");
@@ -212,6 +229,7 @@ export default function GroupAdminPage() {
 	const [allGroupsLoading, setAllGroupsLoading] = useState(false);
 	const [allGroupsError, setAllGroupsError] = useState<string | null>(null);
 	const [allGroups, setAllGroups] = useState<GroupWithId[]>([]);
+	const [rosterDay, setRosterDay] = useState<DayKey>("day1");
 	const [playerEdits, setPlayerEdits] = useState<Record<string, PlayerEditDraft>>({});
 	const [savingPlayerKey, setSavingPlayerKey] = useState<string | null>(null);
 
@@ -278,8 +296,11 @@ export default function GroupAdminPage() {
 						if (!s.exists()) return;
 						const data = s.data() as GroupDoc;
 						setGroup(data);
-						const nextPlayers = (data.playerNames ?? []).filter(Boolean);
-						setScoresByDay(coerceScoresByDay(nextPlayers, data.scores));
+						const legacy = (data.playerNames ?? []).filter(Boolean);
+						const d1 = ((data.playerNamesByDay?.day1 ?? legacy) as string[]).filter(Boolean);
+						const d2 = ((data.playerNamesByDay?.day2 ?? legacy) as string[]).filter(Boolean);
+						const allPlayers = uniqPreserveOrder([...d1, ...d2]);
+						setScoresByDay(coerceScoresByDay(allPlayers, data.scores));
 							if (!day1ParsDraft && Array.isArray(data.tournament?.day1Pars) && data.tournament?.day1Pars?.length === HOLE_COUNT) {
 								setDay1ParsDraft(data.tournament.day1Pars.join(","));
 							}
@@ -379,30 +400,41 @@ export default function GroupAdminPage() {
 			setError(null);
 			try {
 				const current = groupRow.data;
-				const currentPlayers = (current.playerNames ?? []).filter(Boolean);
-				const nextPlayers = currentPlayers.filter((p) => p.toLowerCase() !== player.toLowerCase());
-				if (nextPlayers.length === currentPlayers.length) return;
+				const legacy = (current.playerNames ?? []).filter(Boolean);
+				const curDay1 = ((current.playerNamesByDay?.day1 ?? legacy) as string[]).filter(Boolean);
+				const curDay2 = ((current.playerNamesByDay?.day2 ?? legacy) as string[]).filter(Boolean);
+				const curPlayers = uniqPreserveOrder([...curDay1, ...curDay2]);
+				const curKey = findPlayerKey(curPlayers, player);
+				if (!curKey) return;
+				const lowered = curKey.toLowerCase();
+				const nextDay1 = curDay1.filter((p) => p.toLowerCase() !== lowered);
+				const nextDay2 = curDay2.filter((p) => p.toLowerCase() !== lowered);
+				const nextPlayers = uniqPreserveOrder([...nextDay1, ...nextDay2]);
 
 				const nextHandicaps = { ...(current.handicaps ?? {}) } as Record<string, number | null>;
-				delete nextHandicaps[player];
+				delete nextHandicaps[curKey];
 				const nextDay2Adj = { ...(current.day2HandicapAdjustments ?? {}) } as Record<string, number | null>;
-				delete nextDay2Adj[player];
+				delete nextDay2Adj[curKey];
 				const nextCharity = { ...(current.charityStrokes ?? {}) } as Record<string, number | null>;
-				delete nextCharity[player];
+				delete nextCharity[curKey];
 				const nextTree = { ...(current.treeStrokes ?? {}) } as Record<string, number | null>;
-				delete nextTree[player];
+				delete nextTree[curKey];
 				const nextTeeChoices = {
 					day1: { ...(current.teeChoices?.day1 ?? {}) } as Record<string, TeeKey | null>,
 					day2: { ...(current.teeChoices?.day2 ?? {}) } as Record<string, TeeKey | null>,
 				};
-				delete nextTeeChoices.day1[player];
-				delete nextTeeChoices.day2[player];
+				delete nextTeeChoices.day1[curKey];
+				delete nextTeeChoices.day2[curKey];
 
 				// Normalize scores to the newer { day1, day2 } format and drop the deleted player.
 				const nextScoresByDay = coerceScoresByDay(nextPlayers, current.scores);
 
 				await updateDoc(doc(db, "groups", gid), {
 					playerNames: nextPlayers,
+					playerNamesByDay: {
+						day1: nextDay1,
+						day2: nextDay2,
+					},
 					handicaps: nextHandicaps,
 					day2HandicapAdjustments: nextDay2Adj,
 					charityStrokes: nextCharity,
@@ -417,12 +449,14 @@ export default function GroupAdminPage() {
 			}
 		}
 
-	async function savePlayerEdits(opts: { gid: string; player: string }) {
+	async function savePlayerEdits(opts: { gid: string; player: string; day: DayKey }) {
 		if (!isAdmin) {
 			setError("Admin access required.");
 			return;
 		}
-		const { gid, player } = opts;
+		const { gid, player, day } = opts;
+		const moveDay = day;
+		const otherDay: DayKey = moveDay === "day1" ? "day2" : "day1";
 		const key = editKey(gid, player);
 		const edit = playerEdits[key];
 		const moveToGid = edit?.moveToGid?.trim();
@@ -470,54 +504,89 @@ export default function GroupAdminPage() {
 
 					const from = fromSnap.data() as GroupDoc;
 					const to = toSnap.data() as GroupDoc;
-					const fromPlayers = (from.playerNames ?? []).filter(Boolean);
-					const toPlayers = (to.playerNames ?? []).filter(Boolean);
-					const fromKey = findPlayerKey(fromPlayers, player);
+					const fromLegacy = (from.playerNames ?? []).filter(Boolean);
+					const toLegacy = (to.playerNames ?? []).filter(Boolean);
+					const fromDay1 = ((from.playerNamesByDay?.day1 ?? fromLegacy) as string[]).filter(Boolean);
+					const fromDay2 = ((from.playerNamesByDay?.day2 ?? fromLegacy) as string[]).filter(Boolean);
+					const toDay1 = ((to.playerNamesByDay?.day1 ?? toLegacy) as string[]).filter(Boolean);
+					const toDay2 = ((to.playerNamesByDay?.day2 ?? toLegacy) as string[]).filter(Boolean);
+
+					const fromRoster = moveDay === "day1" ? fromDay1 : fromDay2;
+					const toRoster = moveDay === "day1" ? toDay1 : toDay2;
+					const fromKey = findPlayerKey(fromRoster, player);
 					if (!fromKey) return;
 					const loweredFrom = fromKey.toLowerCase();
 					const toKey = nextName;
 					const loweredTo = toKey.trim().toLowerCase();
 					if (!toKey.trim()) throw new Error("Player name is required.");
-					const toExisting = toPlayers.find((p) => p.toLowerCase() === loweredTo) ?? null;
+					const toExisting = toRoster.find((p) => p.toLowerCase() === loweredTo) ?? null;
 					if (toExisting) throw new Error(`Player already exists in target foursome (${toExisting}).`);
 
-					const nextFromPlayers = fromPlayers.filter((p) => p.toLowerCase() !== loweredFrom);
-					const nextToPlayers = [...toPlayers, toKey];
+					const nextFromDay1 =
+						moveDay === "day1" ? fromDay1.filter((p) => p.toLowerCase() !== loweredFrom) : fromDay1;
+					const nextFromDay2 =
+						moveDay === "day2" ? fromDay2.filter((p) => p.toLowerCase() !== loweredFrom) : fromDay2;
+					const nextToDay1 = moveDay === "day1" ? [...toDay1, toKey] : toDay1;
+					const nextToDay2 = moveDay === "day2" ? [...toDay2, toKey] : toDay2;
+
+					const nextFromPlayers = uniqPreserveOrder([...nextFromDay1, ...nextFromDay2]);
+					const nextToPlayers = uniqPreserveOrder([...nextToDay1, ...nextToDay2]);
+					const stillInFrom = nextFromPlayers.some((p) => p.toLowerCase() === loweredFrom);
 
 					const nextFromHandicaps = { ...(from.handicaps ?? {}) } as Record<string, number | null>;
-					delete nextFromHandicaps[fromKey];
 					const nextFromDay2Adj = { ...(from.day2HandicapAdjustments ?? {}) } as Record<string, number | null>;
-					delete nextFromDay2Adj[fromKey];
 					const nextFromCharity = { ...(from.charityStrokes ?? {}) } as Record<string, number | null>;
-					delete nextFromCharity[fromKey];
 					const nextFromTree = { ...(from.treeStrokes ?? {}) } as Record<string, number | null>;
-					delete nextFromTree[fromKey];
+					if (!stillInFrom) {
+						delete nextFromHandicaps[fromKey];
+						delete nextFromDay2Adj[fromKey];
+						delete nextFromCharity[fromKey];
+						delete nextFromTree[fromKey];
+					}
 					const nextFromTeeChoices = {
 						day1: { ...(from.teeChoices?.day1 ?? {}) } as Record<string, TeeKey | null>,
 						day2: { ...(from.teeChoices?.day2 ?? {}) } as Record<string, TeeKey | null>,
 					};
-					delete nextFromTeeChoices.day1[fromKey];
-					delete nextFromTeeChoices.day2[fromKey];
+					delete nextFromTeeChoices[moveDay][fromKey];
+					if (!stillInFrom) {
+						delete nextFromTeeChoices.day1[fromKey];
+						delete nextFromTeeChoices.day2[fromKey];
+					}
 
-					const fromScoresByDay = coerceScoresByDay(fromPlayers, from.scores);
-					const movedDay1 = fromScoresByDay.day1[fromKey] ?? Array.from({ length: HOLE_COUNT }, () => null);
-					const movedDay2 = fromScoresByDay.day2[fromKey] ?? Array.from({ length: HOLE_COUNT }, () => null);
-					const nextFromScoresByDay = coerceScoresByDay(nextFromPlayers, from.scores);
+					const fromBeforePlayers = uniqPreserveOrder([...fromDay1, ...fromDay2]);
+					const toBeforePlayers = uniqPreserveOrder([...toDay1, ...toDay2]);
+					const fromScoresByDay = coerceScoresByDay(fromBeforePlayers, from.scores);
+					const toScoresByDay = coerceScoresByDay(toBeforePlayers, to.scores);
+					const moved =
+						(moveDay === "day1" ? fromScoresByDay.day1[fromKey] : fromScoresByDay.day2[fromKey]) ??
+						Array.from({ length: HOLE_COUNT }, () => null);
+					if (moveDay === "day1") {
+						delete fromScoresByDay.day1[fromKey];
+						toScoresByDay.day1[toKey] = moved;
+					} else {
+						delete fromScoresByDay.day2[fromKey];
+						toScoresByDay.day2[toKey] = moved;
+					}
+					const nextFromScoresByDay = coerceScoresByDay(nextFromPlayers, fromScoresByDay as any);
+					const nextToScoresByDay = coerceScoresByDay(nextToPlayers, toScoresByDay as any);
 
 					const nextToHandicaps = { ...(to.handicaps ?? {}), [toKey]: safeHandicap };
 					const nextToDay2Adj = { ...(to.day2HandicapAdjustments ?? {}), [toKey]: safeDay2Adj };
 					const nextToCharity = { ...(to.charityStrokes ?? {}), [toKey]: safeCharity };
 					const nextToTree = { ...(to.treeStrokes ?? {}), [toKey]: safeTree };
 					const nextToTeeChoices = {
-						day1: { ...(to.teeChoices?.day1 ?? {}), [toKey]: teeDay1 },
-						day2: { ...(to.teeChoices?.day2 ?? {}), [toKey]: teeDay2 },
+						day1: { ...(to.teeChoices?.day1 ?? {}) } as Record<string, TeeKey | null>,
+						day2: { ...(to.teeChoices?.day2 ?? {}) } as Record<string, TeeKey | null>,
 					};
-					const nextToScoresByDay = coerceScoresByDay(nextToPlayers, to.scores);
-					nextToScoresByDay.day1[toKey] = movedDay1;
-					nextToScoresByDay.day2[toKey] = movedDay2;
+					if (moveDay === "day1") nextToTeeChoices.day1[toKey] = teeDay1;
+					if (moveDay === "day2") nextToTeeChoices.day2[toKey] = teeDay2;
 
 					tx.update(fromRef, {
 						playerNames: nextFromPlayers,
+						playerNamesByDay: {
+							day1: nextFromDay1,
+							day2: nextFromDay2,
+						},
 						handicaps: nextFromHandicaps,
 						day2HandicapAdjustments: nextFromDay2Adj,
 						charityStrokes: nextFromCharity,
@@ -528,6 +597,10 @@ export default function GroupAdminPage() {
 					});
 					tx.update(toRef, {
 						playerNames: nextToPlayers,
+						playerNamesByDay: {
+							day1: nextToDay1,
+							day2: nextToDay2,
+						},
 						handicaps: nextToHandicaps,
 						day2HandicapAdjustments: nextToDay2Adj,
 						charityStrokes: nextToCharity,
@@ -544,7 +617,10 @@ export default function GroupAdminPage() {
 						const snap = await tx.get(ref);
 						if (!snap.exists()) throw new Error("Group not found");
 						const cur = snap.data() as GroupDoc;
-						const curPlayers = (cur.playerNames ?? []).filter(Boolean);
+						const legacy = (cur.playerNames ?? []).filter(Boolean);
+						const curDay1 = ((cur.playerNamesByDay?.day1 ?? legacy) as string[]).filter(Boolean);
+						const curDay2 = ((cur.playerNamesByDay?.day2 ?? legacy) as string[]).filter(Boolean);
+						const curPlayers = uniqPreserveOrder([...curDay1, ...curDay2]);
 						const curKey = findPlayerKey(curPlayers, player);
 						if (!curKey) return;
 						const nextKey = nextName.trim();
@@ -553,6 +629,8 @@ export default function GroupAdminPage() {
 						if (exists) throw new Error(`Player already exists (${exists}).`);
 
 						const nextPlayers = curPlayers.map((p) => (p.toLowerCase() === curKey.toLowerCase() ? nextKey : p));
+						const nextDay1 = curDay1.map((p) => (p.toLowerCase() === curKey.toLowerCase() ? nextKey : p));
+						const nextDay2 = curDay2.map((p) => (p.toLowerCase() === curKey.toLowerCase() ? nextKey : p));
 
 						const curScoresByDay = coerceScoresByDay(curPlayers, cur.scores);
 						const movedDay1 = curScoresByDay.day1[curKey] ?? Array.from({ length: HOLE_COUNT }, () => null);
@@ -586,6 +664,10 @@ export default function GroupAdminPage() {
 
 						tx.update(ref, {
 							playerNames: nextPlayers,
+							playerNamesByDay: {
+								day1: nextDay1,
+								day2: nextDay2,
+							},
 							handicaps: nextHandicaps,
 							day2HandicapAdjustments: nextDay2Adj,
 							charityStrokes: nextCharity,
@@ -605,13 +687,41 @@ export default function GroupAdminPage() {
 						day2: { ...(current.teeChoices?.day2 ?? {}), [player]: teeDay2 },
 					};
 
-					await updateDoc(doc(db, "groups", gid), {
-						handicaps: nextHandicaps,
-						day2HandicapAdjustments: nextDay2Adj,
-						charityStrokes: nextCharity,
-						treeStrokes: nextTree,
-						teeChoices: nextTeeChoices,
-						updatedAt: serverTimestamp(),
+					const lowered = player.trim().toLowerCase();
+					const groupsToUpdate = uniqPreserveOrder(
+						allGroups
+							.filter((g) => {
+								const legacy = (g.data.playerNames ?? []).filter(Boolean);
+								const d1 = ((g.data.playerNamesByDay?.day1 ?? legacy) as string[]).filter(Boolean);
+								const d2 = ((g.data.playerNamesByDay?.day2 ?? legacy) as string[]).filter(Boolean);
+								return [...d1, ...d2].some((p) => p.toLowerCase() === lowered);
+							})
+							.map((g) => g.id)
+					);
+					const targets = groupsToUpdate.length ? groupsToUpdate : [gid];
+					await runTransaction(db, async (tx) => {
+						for (const targetGid of targets) {
+							const ref = doc(db, "groups", targetGid);
+							const snap = await tx.get(ref);
+							if (!snap.exists()) continue;
+							const cur = snap.data() as GroupDoc;
+							const mergedHandicaps = { ...(cur.handicaps ?? {}), [player]: safeHandicap };
+							const mergedDay2Adj = { ...(cur.day2HandicapAdjustments ?? {}), [player]: safeDay2Adj };
+							const mergedCharity = { ...(cur.charityStrokes ?? {}), [player]: safeCharity };
+							const mergedTree = { ...(cur.treeStrokes ?? {}), [player]: safeTree };
+							const mergedTeeChoices = {
+								day1: { ...(cur.teeChoices?.day1 ?? {}), [player]: teeDay1 },
+								day2: { ...(cur.teeChoices?.day2 ?? {}), [player]: teeDay2 },
+							};
+							tx.update(ref, {
+								handicaps: mergedHandicaps,
+								day2HandicapAdjustments: mergedDay2Adj,
+								charityStrokes: mergedCharity,
+								treeStrokes: mergedTree,
+								teeChoices: mergedTeeChoices,
+								updatedAt: serverTimestamp(),
+							});
+						}
 					});
 				}
 			}
@@ -666,10 +776,15 @@ export default function GroupAdminPage() {
 				const snap = await tx.get(ref);
 				if (!snap.exists()) throw new Error("Group not found");
 				const cur = snap.data() as GroupDoc;
-				const curPlayers = (cur.playerNames ?? []).filter(Boolean);
+				const legacy = (cur.playerNames ?? []).filter(Boolean);
+				const curDay1 = ((cur.playerNamesByDay?.day1 ?? legacy) as string[]).filter(Boolean);
+				const curDay2 = ((cur.playerNamesByDay?.day2 ?? legacy) as string[]).filter(Boolean);
+				const curPlayers = uniqPreserveOrder([...curDay1, ...curDay2]);
 				const exists = curPlayers.find((p) => p.toLowerCase() === name.toLowerCase());
 				if (exists) throw new Error(`Player already exists (${exists}).`);
-				const nextPlayers = [...curPlayers, name];
+				const nextDay1 = uniqPreserveOrder([...curDay1, name]);
+				const nextDay2 = uniqPreserveOrder([...curDay2, name]);
+				const nextPlayers = uniqPreserveOrder([...nextDay1, ...nextDay2]);
 
 				const nextHandicaps = { ...(cur.handicaps ?? {}), [name]: safeHandicap };
 				const nextDay2Adj = { ...(cur.day2HandicapAdjustments ?? {}), [name]: safeDay2Adj };
@@ -683,6 +798,10 @@ export default function GroupAdminPage() {
 
 				tx.update(ref, {
 					playerNames: nextPlayers,
+					playerNamesByDay: {
+						day1: nextDay1,
+						day2: nextDay2,
+					},
 					handicaps: nextHandicaps,
 					day2HandicapAdjustments: nextDay2Adj,
 					charityStrokes: nextCharity,
@@ -772,6 +891,27 @@ export default function GroupAdminPage() {
 		}
 	}
 
+	async function setDay1ScoresLocked(nextLocked: boolean) {
+		if (!isAdmin) {
+			setError("Admin access required.");
+			return;
+		}
+		if (!groupId) return;
+		setDay1LockSaving(true);
+		setDay1LockError(null);
+		try {
+			await updateDoc(doc(db, "groups", groupId), {
+				day1ScoresLocked: nextLocked,
+				updatedAt: serverTimestamp(),
+			});
+		} catch (err) {
+			const message = err instanceof Error ? err.message : String(err);
+			setDay1LockError(message);
+		} finally {
+			setDay1LockSaving(false);
+		}
+	}
+
 
 	async function createNewGroup(openAfterCreate: boolean) {
 		if (!isAdmin) {
@@ -804,6 +944,11 @@ export default function GroupAdminPage() {
 				groupName: name || null || undefined,
 				pin,
 				playerNames: players,
+				playerNamesByDay: {
+					day1: players,
+					day2: players,
+				},
+				day1ScoresLocked: false,
 				scores: coerceScoresByDay(players, undefined),
 				handicaps: coerceNumberMap(players, null, 0),
 				day2HandicapAdjustments: coerceNumberMap(players, null, 0),
@@ -916,7 +1061,44 @@ export default function GroupAdminPage() {
 					<>
 						<div className="mt-6 bg-white/80 border border-sky-200 rounded-2xl p-5">
 							<div className="flex items-center justify-between gap-3 flex-wrap">
+								<h2 className="text-lg font-semibold">Scoring lock</h2>
+								<p className="text-sm text-slate-600">Current group: {title}</p>
+							</div>
+							<p className="text-slate-600 text-sm mt-1">Lock Day 1 to prevent edits while you adjust Day 2 handicaps.</p>
+							<div className="mt-3 flex items-center gap-3 flex-wrap">
+								<button
+									onClick={() => setDay1ScoresLocked(!group.day1ScoresLocked)}
+									disabled={day1LockSaving}
+									className={`${
+										group.day1ScoresLocked
+											? "bg-white hover:bg-sky-50 border border-sky-200"
+											: "bg-sky-600 hover:bg-sky-500 text-white"
+									} disabled:opacity-60 px-4 py-2 rounded-lg font-semibold`}
+								>
+									{day1LockSaving ? "Saving…" : group.day1ScoresLocked ? "Unlock Day 1" : "Lock Day 1"}
+								</button>
+								<p className="text-sm text-slate-700">Status: {group.day1ScoresLocked ? "Locked" : "Unlocked"}</p>
+							</div>
+							{day1LockError ? <p className="text-sm text-red-600 mt-2">{day1LockError}</p> : null}
+						</div>
+
+						<div className="mt-6 bg-white/80 border border-sky-200 rounded-2xl p-5">
+							<div className="flex items-center justify-between gap-3 flex-wrap">
 								<h2 className="text-lg font-semibold">All players (all foursomes)</h2>
+								<div className="inline-flex rounded-lg border border-sky-200 overflow-hidden bg-white/70">
+									<button
+										onClick={() => setRosterDay("day1")}
+										className={`px-4 py-2 text-sm ${rosterDay === "day1" ? "bg-sky-600 text-white" : "bg-white/60 hover:bg-white"}`}
+									>
+										Day 1
+									</button>
+									<button
+										onClick={() => setRosterDay("day2")}
+										className={`px-4 py-2 text-sm ${rosterDay === "day2" ? "bg-sky-600 text-white" : "bg-white/60 hover:bg-white"}`}
+									>
+										Day 2
+									</button>
+								</div>
 								{allGroupsLoading ? (
 									<p className="text-sm text-slate-600">Loading…</p>
 								) : (
@@ -947,7 +1129,12 @@ export default function GroupAdminPage() {
 											.flatMap((g) => {
 												const gTitle = getGroupTitle(g.data, g.id);
 												const gPin = g.data.pin ?? "";
-												const gPlayers = (g.data.playerNames ?? []).filter(Boolean);
+												const legacy = (g.data.playerNames ?? []).filter(Boolean);
+												const gPlayers = (
+													rosterDay === "day1"
+														? (g.data.playerNamesByDay?.day1 ?? legacy)
+														: (g.data.playerNamesByDay?.day2 ?? legacy)
+												).filter(Boolean);
 												return gPlayers.map((player) => {
 													const key = editKey(g.id, player);
 													const edit = playerEdits[key];
@@ -1090,7 +1277,7 @@ export default function GroupAdminPage() {
 																		Delete
 																	</button>
 																	<button
-																		onClick={() => savePlayerEdits({ gid: g.id, player })}
+																		onClick={() => savePlayerEdits({ gid: g.id, player, day: rosterDay })}
 																		disabled={isRowSaving}
 																			className="bg-sky-600 hover:bg-sky-500 disabled:opacity-60 px-3 py-2 rounded-lg font-semibold text-white"
 																	>
