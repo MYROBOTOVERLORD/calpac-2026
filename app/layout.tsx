@@ -35,6 +35,7 @@ export default function RootLayout({
             width={140}
             height={140}
             priority
+            className="w-[98px] h-[98px] sm:w-[140px] sm:h-[140px]"
           />
         </div>
         {children}

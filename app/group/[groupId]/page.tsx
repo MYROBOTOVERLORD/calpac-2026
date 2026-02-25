@@ -855,12 +855,12 @@ export default function GroupPage() {
 					) : (
 						<>
 							<div className="mt-4 sm:mt-6 overflow-x-auto bg-white/80 border border-sky-200 rounded-2xl">
-								<table className="w-full min-w-[720px] text-xs sm:text-sm">
+								<table className="w-full min-w-[680px] text-xs sm:text-sm">
 									<thead className="bg-sky-100/70">
 										<tr className="text-left">
-											<th className="p-1.5 sm:p-3 text-slate-700">Hole</th>
+											<th className="p-1 sm:p-3 text-slate-700">Hole</th>
 											{players.map((p) => (
-												<th key={p} className="p-1.5 sm:p-3 text-slate-700 whitespace-nowrap">
+												<th key={p} className="p-1 sm:p-3 text-slate-700 whitespace-nowrap">
 													{p}
 												</th>
 											))}
@@ -869,7 +869,7 @@ export default function GroupPage() {
 									<tbody>
 										{Array.from({ length: HOLE_COUNT }, (_, holeIdx) => (
 											<tr key={holeIdx} className={holeIdx % 2 ? "bg-white/40" : "bg-white/70"}>
-												<td className="p-1.5 sm:p-3 text-slate-800 font-semibold whitespace-nowrap">
+												<td className="p-1 sm:p-3 text-slate-800 font-semibold whitespace-nowrap">
 													<div className="sm:hidden">
 														<div>Hole {holeIdx + 1}</div>
 														{dayPars || dayHcps ? (
@@ -894,8 +894,8 @@ export default function GroupPage() {
 													const holeStroke = dayHcps ? strokesForHole(dayHcps[holeIdx], totalStrokes) : 0;
 													const netHole = typeof v === "number" && Number.isFinite(v) ? v - holeStroke : null;
 													return (
-														<td key={`${p}-${holeIdx}`} className="p-1.5 sm:p-3">
-															<div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
+														<td key={`${p}-${holeIdx}`} className="p-1 sm:p-3">
+															<div className="flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-3">
 																<input
 																	disabled={isDay1LockedView}
 																	value={typeof v === "number" ? String(v) : ""}
@@ -919,7 +919,7 @@ export default function GroupPage() {
 																	}}
 																	inputMode="numeric"
 																	pattern="[0-9]*"
-																	className={`w-14 sm:w-20 p-1.5 sm:p-2 border rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-sky-200 ${
+																	className={`w-12 sm:w-20 p-1 sm:p-2 border rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-sky-200 ${
 																		isDay1LockedView
 																			? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed"
 																			: "bg-white border-sky-200"
