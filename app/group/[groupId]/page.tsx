@@ -1083,8 +1083,38 @@ export default function GroupPage() {
 								</div>
 
 								<div className="mt-2 sm:mt-3 grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 items-start">
-									<div className="bg-white border border-sky-200 rounded-xl p-2 sm:p-3 overflow-x-auto self-start">
-										<table className="w-full min-w-[560px] text-xs sm:text-sm">
+									<div className="bg-white border border-sky-200 rounded-xl p-2 sm:p-3 self-start">
+										<div className="sm:hidden space-y-2">
+											{players.map((p) => (
+												<div key={`tot-m-${p}`} className="bg-white border border-sky-200 rounded-xl p-2">
+													<div className="text-sm font-semibold text-slate-900 truncate">{p}</div>
+													<div className="mt-1 grid grid-cols-2 gap-2 text-xs text-slate-700">
+														<div>
+															<div className="text-[10px] text-slate-500">Handicap</div>
+															<div className="font-semibold text-slate-900">{handicaps[p] ?? 0}</div>
+														</div>
+														{selectedDay === "day2" ? (
+															<div>
+																<div className="text-[10px] text-slate-500">Day 2 adj</div>
+																<div className="font-semibold text-slate-900">{day2Adjustments[p] ?? 0}</div>
+															</div>
+														) : null}
+														<div>
+															<div className="text-[10px] text-slate-500">Gross</div>
+															<div className="font-semibold text-slate-900">{grossTotals[p] ?? 0}</div>
+														</div>
+														<div>
+															<div className="text-[10px] text-slate-500">Net*</div>
+															<div className="font-semibold text-slate-900">{netTotals[p] ?? 0}</div>
+														</div>
+													</div>
+												</div>
+											))}
+											<p className="text-xs text-slate-500">*Net includes tee bonus. Charity + Tree strokes apply to final score only.</p>
+										</div>
+
+										<div className="hidden sm:block overflow-x-auto">
+											<table className="w-full min-w-[560px] text-xs sm:text-sm">
 											<thead>
 												<tr className="text-left text-slate-700">
 													<th className="p-1.5 sm:p-2">Player</th>
@@ -1106,7 +1136,8 @@ export default function GroupPage() {
 												))}
 											</tbody>
 										</table>
-										<p className="text-xs text-slate-500 mt-1 sm:mt-2">*Net includes tee bonus. Charity + Tree strokes apply to final score only.</p>
+											<p className="text-xs text-slate-500 mt-1 sm:mt-2">*Net includes tee bonus. Charity + Tree strokes apply to final score only.</p>
+										</div>
 									</div>
 
 									<div className="bg-white border border-sky-200 rounded-xl p-2 sm:p-3 self-start">
