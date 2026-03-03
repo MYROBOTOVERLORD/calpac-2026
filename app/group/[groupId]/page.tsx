@@ -892,8 +892,77 @@ export default function GroupPage() {
 						</div>
 					) : (
 						<>
-							<div className="mt-4 sm:mt-6 overflow-x-auto bg-white/80 border border-sky-200 rounded-2xl">
-								<table className="w-full min-w-[680px] text-xs sm:text-sm">
+							<div className="mt-4 sm:mt-6 bg-white/80 border border-sky-200 rounded-2xl">
+								<div className="sm:hidden divide-y divide-sky-100">
+									{Array.from({ length: HOLE_COUNT }, (_, holeIdx) => (
+										<div key={`m-${holeIdx}`} className={"p-2"}>
+											<div className="text-slate-900 font-semibold">Hole {holeIdx + 1}</div>
+											{dayPars || dayHcps ? (
+												<div className="text-xs text-slate-500 mt-0.5">
+													{dayPars ? <span>Par {dayPars[holeIdx]}</span> : null}
+													{dayPars && dayHcps ? <span> · </span> : null}
+													{dayHcps ? <span>Hcp {dayHcps[holeIdx]}</span> : null}
+												</div>
+											) : null}
+											<div className="mt-2 grid grid-cols-2 gap-2">
+												{players.map((p) => {
+													const v = scores[p]?.[holeIdx];
+													const base = handicaps[p] ?? 0;
+													const adj = selectedDay === "day2" ? (day2Adjustments[p] ?? 0) : 0;
+													const teeBonus = teeBonusForDay(selectedDay, teeChoicesByDay[selectedDay]?.[p]);
+													const totalStrokes = base + adj + teeBonus;
+													const holeStroke = dayHcps ? strokesForHole(dayHcps[holeIdx], totalStrokes) : 0;
+													const netHole = typeof v === "number" && Number.isFinite(v) ? v - holeStroke : null;
+
+													return (
+														<div key={`m-${p}-${holeIdx}`} className="bg-white border border-sky-200 rounded-xl p-2">
+														<div className="text-[11px] font-semibold text-slate-800 truncate">{p}</div>
+														<div className="mt-1 flex items-center justify-between gap-2">
+															<input
+																disabled={isDay1LockedView}
+																value={typeof v === "number" ? String(v) : ""}
+																onChange={(e) => {
+																	if (isDay1LockedView) return;
+																	const raw = e.target.value;
+																	const parsed = raw === "" ? null : Number(raw);
+																	const nextScoresTable = {
+																		...scores,
+																		[p]: Array.from({ length: HOLE_COUNT }, (_, i) => scores[p]?.[i] ?? null),
+																	};
+																	nextScoresTable[p][holeIdx] =
+																		typeof parsed === "number" && Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+
+																	const nextScoresByDay = {
+																		...scoresByDay,
+																		[selectedDay]: nextScoresTable,
+																	};
+																	setScoresByDay(nextScoresByDay);
+																	scheduleSave({ scores: nextScoresByDay });
+																}}
+																inputMode="numeric"
+																pattern="[0-9]*"
+																className={`w-12 p-1 border rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-sky-200 ${
+																	isDay1LockedView
+																		? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed"
+																		: "bg-white border-sky-200"
+																}`}
+																placeholder="-"
+															/>
+															<div className="text-right whitespace-nowrap">
+																<div className="text-base font-semibold text-slate-900 leading-none">{netHole == null ? "—" : netHole}</div>
+																{netHole != null && holeStroke ? <div className="text-[10px] text-slate-500">−{holeStroke}</div> : null}
+															</div>
+														</div>
+													</div>
+												);
+											})}
+										</div>
+									</div>
+								))}
+							</div>
+
+								<div className="hidden sm:block overflow-x-auto">
+									<table className="w-full min-w-[680px] text-xs sm:text-sm">
 									<thead className="bg-sky-100/70">
 										<tr className="text-left">
 											<th className="pl-1 pr-0.5 py-1 sm:p-3 text-slate-700">Hole</th>
@@ -1005,6 +1074,7 @@ export default function GroupPage() {
 										</tr>
 									</tbody>
 								</table>
+									</div>
 							</div>
 
 							<div className="mt-4 sm:mt-6 bg-white/80 border border-sky-200 rounded-2xl p-3 sm:p-5">
