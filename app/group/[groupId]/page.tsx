@@ -486,6 +486,7 @@ export default function GroupPage() {
 		player: string;
 		handicap: number;
 		adjustment: number;
+		strokes: number;
 		gross: number;
 		net: number;
 		toPar: number | null;
@@ -499,6 +500,7 @@ export default function GroupPage() {
 			const teeBonus = teeBonusForDay("day1", teeChoicesByDay.day1?.[p]);
 			const charity = charityStrokes[p] ?? 0;
 			const tree = treeStrokes[p] ?? 0;
+			const strokes = charity + tree;
 			const allocationStrokes = handicap + teeBonus;
 			const netBeforeCharity = computeNetRunningTotal({
 				scores: scoresByDay.day1[p] ?? Array.from({ length: HOLE_COUNT }, () => null),
@@ -514,6 +516,7 @@ export default function GroupPage() {
 				player: p,
 				handicap,
 				adjustment: 0,
+				strokes,
 				gross,
 				net,
 				toPar,
@@ -534,6 +537,7 @@ export default function GroupPage() {
 			const teeBonus = teeBonusForDay("day2", teeChoicesByDay.day2?.[p]);
 			const charity = charityStrokes[p] ?? 0;
 			const tree = treeStrokes[p] ?? 0;
+			const strokes = charity + tree;
 			const allocationStrokes = handicap + adjustment + teeBonus;
 			const netBeforeCharity = computeNetRunningTotal({
 				scores: scoresByDay.day2[p] ?? Array.from({ length: HOLE_COUNT }, () => null),
@@ -549,6 +553,7 @@ export default function GroupPage() {
 				player: p,
 				handicap,
 				adjustment,
+				strokes,
 				gross,
 				net,
 				toPar,
@@ -1103,6 +1108,10 @@ export default function GroupPage() {
 															<div className="text-[10px] text-slate-500">Gross</div>
 															<div className="font-semibold text-slate-900">{grossTotals[p] ?? 0}</div>
 														</div>
+																<div>
+																	<div className="text-[10px] text-slate-500">Strokes</div>
+																	<div className="font-semibold text-slate-900">{(charityStrokes[p] ?? 0) + (treeStrokes[p] ?? 0)}</div>
+																</div>
 														<div>
 															<div className="text-[10px] text-slate-500">Net*</div>
 															<div className="font-semibold text-slate-900">{netTotals[p] ?? 0}</div>
@@ -1110,7 +1119,7 @@ export default function GroupPage() {
 													</div>
 												</div>
 											))}
-											<p className="text-xs text-slate-500">*Net includes tee bonus. Charity + Tree strokes apply to final score only.</p>
+											<p className="text-xs text-slate-500">*Net includes tee bonus. Strokes apply to final score only.</p>
 										</div>
 
 										<div className="hidden sm:block overflow-x-auto">
@@ -1121,6 +1130,7 @@ export default function GroupPage() {
 													<th className="p-1.5 sm:p-2">Handicap</th>
 													{selectedDay === "day2" ? <th className="p-1.5 sm:p-2">Day 2 adj</th> : null}
 													<th className="p-1.5 sm:p-2">Gross</th>
+																<th className="p-1.5 sm:p-2">Strokes</th>
 													<th className="p-1.5 sm:p-2">Net*</th>
 												</tr>
 											</thead>
@@ -1131,12 +1141,13 @@ export default function GroupPage() {
 														<td className="p-1.5 sm:p-2 text-slate-800">{handicaps[p] ?? 0}</td>
 														{selectedDay === "day2" ? <td className="p-1.5 sm:p-2 text-slate-800">{day2Adjustments[p] ?? 0}</td> : null}
 														<td className="p-1.5 sm:p-2 text-slate-800">{grossTotals[p] ?? 0}</td>
+															<td className="p-1.5 sm:p-2 text-slate-800">{(charityStrokes[p] ?? 0) + (treeStrokes[p] ?? 0)}</td>
 														<td className="p-1.5 sm:p-2 text-slate-800">{netTotals[p] ?? 0}</td>
 													</tr>
 												))}
 											</tbody>
 										</table>
-											<p className="text-xs text-slate-500 mt-1 sm:mt-2">*Net includes tee bonus. Charity + Tree strokes apply to final score only.</p>
+											<p className="text-xs text-slate-500 mt-1 sm:mt-2">*Net includes tee bonus. Strokes apply to final score only.</p>
 										</div>
 									</div>
 
@@ -1253,6 +1264,7 @@ export default function GroupPage() {
 													<th className="p-2">Player</th>
 													<th className="p-2">HCP</th>
 													<th className="p-2">Gross</th>
+																			<th className="p-2">Strokes</th>
 													<th className="p-2">Net</th>
 																<th className="p-2">To Par</th>
 												</tr>
@@ -1264,6 +1276,7 @@ export default function GroupPage() {
 														<td className="p-2 text-slate-900 font-semibold">{r.player}</td>
 														<td className="p-2 text-slate-800">{r.handicap}</td>
 														<td className="p-2 text-slate-800">{r.gross}</td>
+																			<td className="p-2 text-slate-800">{r.strokes}</td>
 														<td className="p-2 text-slate-800">{r.net}</td>
 														<td className="p-2 text-slate-800">
 																	{r.toPar == null ? "—" : r.toPar === 0 ? "E" : r.toPar < 0 ? `${r.toPar}` : `+${r.toPar}`}
@@ -1287,6 +1300,7 @@ export default function GroupPage() {
 													<th className="p-2">HCP</th>
 													<th className="p-2">Adj</th>
 													<th className="p-2">Gross</th>
+																			<th className="p-2">Strokes</th>
 													<th className="p-2">Net</th>
 																<th className="p-2">To Par</th>
 												</tr>
@@ -1299,6 +1313,7 @@ export default function GroupPage() {
 														<td className="p-2 text-slate-800">{r.handicap}</td>
 														<td className="p-2 text-slate-800">{r.adjustment}</td>
 														<td className="p-2 text-slate-800">{r.gross}</td>
+																			<td className="p-2 text-slate-800">{r.strokes}</td>
 														<td className="p-2 text-slate-800">{r.net}</td>
 														<td className="p-2 text-slate-800">
 																	{r.toPar == null ? "—" : r.toPar === 0 ? "E" : r.toPar < 0 ? `${r.toPar}` : `+${r.toPar}`}
