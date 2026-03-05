@@ -9,7 +9,6 @@ import {
 	onSnapshot,
 	serverTimestamp,
 	setDoc,
-	updateDoc,
 	deleteDoc,
 	type Timestamp,
 } from "firebase/firestore";
@@ -49,6 +48,11 @@ const EVENT_ID = "current";
 
 function safeIntString(v: string) {
 	const n = Math.floor(Number(v || 0));
+	return Number.isFinite(n) ? n : 0;
+}
+
+function safeInt(v: unknown) {
+	const n = Math.floor(Number(v ?? 0));
 	return Number.isFinite(n) ? n : 0;
 }
 
@@ -236,10 +240,17 @@ export default function CalcuttaAdminPage() {
 		setRowSavingId(id);
 		setRowError(null);
 		try {
-			await updateDoc(doc(db, "calcuttaEvents", EVENT_ID, "teams", id), {
-				...draft,
-				updatedAt: serverTimestamp(),
-			});
+			const payload: CalcuttaTeamDoc = {
+				teamName: (draft.teamName ?? "").trim(),
+				playerA: (draft.playerA ?? "").trim(),
+				playerB: (draft.playerB ?? "").trim(),
+				handicapA: safeInt(draft.handicapA),
+				handicapB: safeInt(draft.handicapB),
+				grossA: safeInt(draft.grossA),
+				grossB: safeInt(draft.grossB),
+				updatedAt: serverTimestamp() as any,
+			};
+			await setDoc(doc(db, "calcuttaEvents", EVENT_ID, "teams", id), payload, { merge: true });
 		} catch (err) {
 			const message = err instanceof Error ? err.message : String(err);
 			setRowError(message);
