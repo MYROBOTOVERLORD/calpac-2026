@@ -153,12 +153,6 @@ export default function CalcuttaPage() {
 					</div>
 					<div className="flex gap-2">
 						<button
-							onClick={() => router.push("/")}
-							className="bg-white hover:bg-sky-50 border border-sky-200 px-4 py-2 rounded-lg text-sm"
-						>
-							Back to PIN login
-						</button>
-						<button
 							onClick={() => router.push("/calcutta/admin")}
 							className="bg-sky-600 hover:bg-sky-500 px-4 py-2 rounded-lg font-semibold text-white"
 						>
