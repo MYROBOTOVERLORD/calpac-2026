@@ -72,6 +72,13 @@ export default function Home() {
           {loading ? "Checking..." : "Enter"}
         </button>
 
+        <button
+          onClick={() => router.push("/calcutta")}
+          className="w-full mt-2 bg-white hover:bg-sky-50 border border-sky-200 p-3 rounded-lg font-semibold text-slate-900"
+        >
+          Calcutta
+        </button>
+
         {error ? <p className="text-sm text-red-300 mt-3">{error}</p> : null}
 
         <p className="text-xs text-slate-500 mt-4">
