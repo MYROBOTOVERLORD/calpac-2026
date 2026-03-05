@@ -18,8 +18,7 @@ type CalcuttaTeamDoc = {
 	playerB?: string;
 	handicapA?: number;
 	handicapB?: number;
-	grossA?: number;
-	grossB?: number;
+	scores?: Array<number | null>;
 	createdAt?: Timestamp;
 	updatedAt?: Timestamp;
 };
@@ -31,18 +30,35 @@ type TeamRow = {
 	playerB: string;
 	handicapA: number;
 	handicapB: number;
-	grossA: number;
-	grossB: number;
-	netA: number;
-	netB: number;
-	teamGross: number;
-	teamNet: number;
+	teamHandicap: number;
+	teamGross: number | null;
+	teamNet: number | null;
 };
 
 const EVENT_ID = "current";
 
 function safeNum(n: unknown, fallback = 0) {
 	return typeof n === "number" && Number.isFinite(n) ? n : fallback;
+}
+
+function coerceScores(input: unknown) {
+	const raw = Array.isArray(input) ? input : [];
+	return Array.from({ length: 18 }, (_, i) => {
+		const v = raw[i];
+		return typeof v === "number" && Number.isFinite(v) ? Math.floor(v) : null;
+	});
+}
+
+function isCompleteRound(scores: Array<number | null>) {
+	return scores.length === 18 && scores.every((s) => typeof s === "number" && Number.isFinite(s));
+}
+
+function sumScores(scores: Array<number | null>) {
+	let total = 0;
+	for (const s of scores) {
+		if (typeof s === "number" && Number.isFinite(s)) total += s;
+	}
+	return total;
 }
 
 export default function CalcuttaPage() {
@@ -93,12 +109,11 @@ export default function CalcuttaPage() {
 			const playerB = (data.playerB ?? "").trim();
 			const handicapA = Math.floor(safeNum(data.handicapA, 0));
 			const handicapB = Math.floor(safeNum(data.handicapB, 0));
-			const grossA = Math.floor(safeNum(data.grossA, 0));
-			const grossB = Math.floor(safeNum(data.grossB, 0));
-			const netA = grossA - handicapA;
-			const netB = grossB - handicapB;
-			const teamGross = grossA + grossB;
-			const teamNet = netA + netB;
+			const teamHandicap = handicapA + handicapB;
+			const scores = coerceScores(data.scores);
+			const complete = isCompleteRound(scores);
+			const teamGross = complete ? sumScores(scores) : null;
+			const teamNet = teamGross == null ? null : teamGross - teamHandicap;
 			const teamName = (data.teamName ?? "").trim() || `${playerA || "Player A"} / ${playerB || "Player B"}`;
 			return {
 				id,
@@ -107,16 +122,19 @@ export default function CalcuttaPage() {
 				playerB: playerB || "—",
 				handicapA,
 				handicapB,
-				grossA,
-				grossB,
-				netA,
-				netB,
+				teamHandicap,
 				teamGross,
 				teamNet,
 			};
 		});
 
-		out.sort((a, b) => a.teamNet - b.teamNet || a.teamGross - b.teamGross || a.teamName.localeCompare(b.teamName));
+		out.sort((a, b) => {
+			const an = a.teamNet == null ? Number.POSITIVE_INFINITY : a.teamNet;
+			const bn = b.teamNet == null ? Number.POSITIVE_INFINITY : b.teamNet;
+			const ag = a.teamGross == null ? Number.POSITIVE_INFINITY : a.teamGross;
+			const bg = b.teamGross == null ? Number.POSITIVE_INFINITY : b.teamGross;
+			return an - bn || ag - bg || a.teamName.localeCompare(b.teamName);
+		});
 		return out;
 	}, [teams]);
 
@@ -164,21 +182,15 @@ export default function CalcuttaPage() {
 					</div>
 
 					<div className="mt-3 overflow-x-auto bg-white border border-sky-200 rounded-xl p-2 sm:p-3">
-						<table className="w-full min-w-[720px] text-sm">
+						<table className="w-full min-w-[640px] text-sm">
 							<thead>
 								<tr className="text-left text-slate-700">
 									<th className="p-2">#</th>
 									<th className="p-2">Team</th>
-									<th className="p-2">Player A</th>
-									<th className="p-2">HCP</th>
+									<th className="p-2">Players</th>
+									<th className="p-2">Team HCP</th>
 									<th className="p-2">Gross</th>
 									<th className="p-2">Net</th>
-									<th className="p-2">Player B</th>
-									<th className="p-2">HCP</th>
-									<th className="p-2">Gross</th>
-									<th className="p-2">Net</th>
-									<th className="p-2">Team Gross</th>
-									<th className="p-2">Team Net</th>
 								</tr>
 							</thead>
 							<tbody>
@@ -187,21 +199,17 @@ export default function CalcuttaPage() {
 										<tr key={r.id} className="border-t border-sky-100">
 											<td className="p-2 text-slate-500">{idx + 1}</td>
 											<td className="p-2 text-slate-900 font-semibold whitespace-nowrap">{r.teamName}</td>
-											<td className="p-2 text-slate-800 whitespace-nowrap">{r.playerA}</td>
-											<td className="p-2 text-slate-800">{r.handicapA}</td>
-											<td className="p-2 text-slate-800">{r.grossA}</td>
-											<td className="p-2 text-slate-800 font-semibold">{r.netA}</td>
-											<td className="p-2 text-slate-800 whitespace-nowrap">{r.playerB}</td>
-											<td className="p-2 text-slate-800">{r.handicapB}</td>
-											<td className="p-2 text-slate-800">{r.grossB}</td>
-											<td className="p-2 text-slate-800 font-semibold">{r.netB}</td>
-											<td className="p-2 text-slate-800">{r.teamGross}</td>
-											<td className="p-2 text-slate-800 font-semibold">{r.teamNet}</td>
+											<td className="p-2 text-slate-800 whitespace-nowrap">
+												{r.playerA} ({r.handicapA}) · {r.playerB} ({r.handicapB})
+											</td>
+											<td className="p-2 text-slate-800">{r.teamHandicap}</td>
+											<td className="p-2 text-slate-800">{r.teamGross == null ? "—" : r.teamGross}</td>
+											<td className="p-2 text-slate-800 font-semibold">{r.teamNet == null ? "—" : r.teamNet}</td>
 										</tr>
 									))
 								) : (
 									<tr>
-										<td className="p-3 text-slate-600" colSpan={12}>
+										<td className="p-3 text-slate-600" colSpan={6}>
 											No teams yet.
 										</td>
 									</tr>
@@ -212,7 +220,7 @@ export default function CalcuttaPage() {
 				</div>
 
 				<div className="mt-4 text-xs text-slate-500">
-					Net = Gross − Handicap (per player). Team Net = Net A + Net B.
+					Best ball: enter one score per hole (team score). Totals show after all 18 holes are entered. Team Net = Team Gross − (HCP A + HCP B).
 				</div>
 			</div>
 		</main>

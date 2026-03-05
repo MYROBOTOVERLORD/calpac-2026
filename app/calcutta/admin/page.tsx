@@ -28,8 +28,7 @@ type CalcuttaTeamDoc = {
 	playerB?: string;
 	handicapA?: number;
 	handicapB?: number;
-	grossA?: number;
-	grossB?: number;
+	scores?: Array<number | null>;
 	createdAt?: Timestamp;
 	updatedAt?: Timestamp;
 };
@@ -40,8 +39,6 @@ type TeamDraft = {
 	playerB: string;
 	handicapA: string;
 	handicapB: string;
-	grossA: string;
-	grossB: string;
 };
 
 const EVENT_ID = "current";
@@ -54,6 +51,26 @@ function safeIntString(v: string) {
 function safeInt(v: unknown) {
 	const n = Math.floor(Number(v ?? 0));
 	return Number.isFinite(n) ? n : 0;
+}
+
+function coerceScores(input: unknown) {
+	const raw = Array.isArray(input) ? input : [];
+	return Array.from({ length: 18 }, (_, i) => {
+		const v = raw[i];
+		return typeof v === "number" && Number.isFinite(v) ? Math.floor(v) : null;
+	});
+}
+
+function isCompleteRound(scores: Array<number | null>) {
+	return scores.length === 18 && scores.every((s) => typeof s === "number" && Number.isFinite(s));
+}
+
+function sumScores(scores: Array<number | null>) {
+	let total = 0;
+	for (const s of scores) {
+		if (typeof s === "number" && Number.isFinite(s)) total += s;
+	}
+	return total;
 }
 
 export default function CalcuttaAdminPage() {
@@ -95,8 +112,6 @@ export default function CalcuttaAdminPage() {
 		playerB: "",
 		handicapA: "0",
 		handicapB: "0",
-		grossA: "0",
-		grossB: "0",
 	});
 	const [addTeamError, setAddTeamError] = useState<string | null>(null);
 	const [addingTeam, setAddingTeam] = useState(false);
@@ -218,12 +233,11 @@ export default function CalcuttaAdminPage() {
 				playerB,
 				handicapA: safeIntString(newTeam.handicapA),
 				handicapB: safeIntString(newTeam.handicapB),
-				grossA: safeIntString(newTeam.grossA),
-				grossB: safeIntString(newTeam.grossB),
+				scores: Array.from({ length: 18 }, () => null),
 				createdAt: serverTimestamp(),
 				updatedAt: serverTimestamp(),
 			});
-			setNewTeam({ teamName: "", playerA: "", playerB: "", handicapA: "0", handicapB: "0", grossA: "0", grossB: "0" });
+			setNewTeam({ teamName: "", playerA: "", playerB: "", handicapA: "0", handicapB: "0" });
 		} catch (err) {
 			const message = err instanceof Error ? err.message : String(err);
 			setAddTeamError(message);
@@ -246,8 +260,7 @@ export default function CalcuttaAdminPage() {
 				playerB: (draft.playerB ?? "").trim(),
 				handicapA: safeInt(draft.handicapA),
 				handicapB: safeInt(draft.handicapB),
-				grossA: safeInt(draft.grossA),
-				grossB: safeInt(draft.grossB),
+				scores: coerceScores(draft.scores),
 				updatedAt: serverTimestamp() as any,
 			};
 			await setDoc(doc(db, "calcuttaEvents", EVENT_ID, "teams", id), payload, { merge: true });
@@ -413,26 +426,18 @@ export default function CalcuttaAdminPage() {
 							placeholder="A HCP"
 						/>
 						<input
-							value={newTeam.grossA}
-							onChange={(e) => setNewTeam((p) => ({ ...p, grossA: e.target.value }))}
-							inputMode="numeric"
-							className="p-2 bg-white border border-sky-200 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-sky-200"
-							placeholder="A Gross"
-						/>
-						<input
 							value={newTeam.handicapB}
 							onChange={(e) => setNewTeam((p) => ({ ...p, handicapB: e.target.value }))}
 							inputMode="numeric"
 							className="p-2 bg-white border border-sky-200 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-sky-200"
 							placeholder="B HCP"
 						/>
-						<input
-							value={newTeam.grossB}
-							onChange={(e) => setNewTeam((p) => ({ ...p, grossB: e.target.value }))}
-							inputMode="numeric"
-							className="p-2 bg-white border border-sky-200 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-sky-200"
-							placeholder="B Gross"
-						/>
+						<div className="p-2 bg-sky-50 border border-sky-200 rounded-lg text-xs text-slate-700 flex items-center justify-center text-center">
+							Hole-by-hole scores are entered below.
+						</div>
+						<div className="p-2 bg-sky-50 border border-sky-200 rounded-lg text-xs text-slate-700 flex items-center justify-center text-center">
+							Best ball: one score per hole.
+						</div>
 					</div>
 					{addTeamError ? <p className="text-sm text-red-600 mt-2">{addTeamError}</p> : null}
 				</div>
@@ -449,10 +454,10 @@ export default function CalcuttaAdminPage() {
 									<th className="p-2">Team</th>
 									<th className="p-2">Player A</th>
 									<th className="p-2">A HCP</th>
-									<th className="p-2">A Gross</th>
 									<th className="p-2">Player B</th>
 									<th className="p-2">B HCP</th>
-									<th className="p-2">B Gross</th>
+									<th className="p-2">Team Gross</th>
+									<th className="p-2">Team Net</th>
 									<th className="p-2"></th>
 								</tr>
 							</thead>
@@ -464,12 +469,15 @@ export default function CalcuttaAdminPage() {
 									const playerB = data.playerB ?? "";
 									const handicapA = String(Math.floor(typeof data.handicapA === "number" ? data.handicapA : 0));
 									const handicapB = String(Math.floor(typeof data.handicapB === "number" ? data.handicapB : 0));
-									const grossA = String(Math.floor(typeof data.grossA === "number" ? data.grossA : 0));
-									const grossB = String(Math.floor(typeof data.grossB === "number" ? data.grossB : 0));
+									const scores = coerceScores(data.scores);
+									const complete = isCompleteRound(scores);
+									const teamGross = complete ? sumScores(scores) : null;
+									const teamNet = teamGross == null ? null : teamGross - (safeInt(data.handicapA) + safeInt(data.handicapB));
 
 									return (
-										<tr key={id} className="border-t border-sky-100 align-top">
-											<td className="p-2">
+										<>
+											<tr key={id} className="border-t border-sky-100 align-top">
+												<td className="p-2">
 												<input
 													defaultValue={teamName}
 													disabled={disabled}
@@ -498,15 +506,6 @@ export default function CalcuttaAdminPage() {
 											</td>
 											<td className="p-2">
 												<input
-													defaultValue={grossA}
-													disabled={disabled}
-													inputMode="numeric"
-													className="w-20 p-2 text-center bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200 disabled:opacity-60"
-													onBlur={(e) => saveTeam(id, { ...data, grossA: safeIntString(e.target.value) })}
-												/>
-											</td>
-											<td className="p-2">
-												<input
 													defaultValue={playerB}
 													disabled={disabled}
 													className="w-48 p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200 disabled:opacity-60"
@@ -523,15 +522,8 @@ export default function CalcuttaAdminPage() {
 													onBlur={(e) => saveTeam(id, { ...data, handicapB: safeIntString(e.target.value) })}
 												/>
 											</td>
-											<td className="p-2">
-												<input
-													defaultValue={grossB}
-													disabled={disabled}
-													inputMode="numeric"
-													className="w-20 p-2 text-center bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200 disabled:opacity-60"
-													onBlur={(e) => saveTeam(id, { ...data, grossB: safeIntString(e.target.value) })}
-												/>
-											</td>
+											<td className="p-2 text-slate-800 whitespace-nowrap">{teamGross == null ? "—" : teamGross}</td>
+											<td className="p-2 text-slate-800 whitespace-nowrap font-semibold">{teamNet == null ? "—" : teamNet}</td>
 											<td className="p-2 whitespace-nowrap">
 												<button
 													onClick={() => removeTeam(id)}
@@ -541,7 +533,34 @@ export default function CalcuttaAdminPage() {
 													Delete
 												</button>
 											</td>
-										</tr>
+											</tr>
+											<tr className="border-t border-sky-100">
+											<td className="p-2" colSpan={8}>
+												<div className="text-xs text-slate-600 mb-2">Hole scores (best ball: enter 1 score per hole)</div>
+												<div className="overflow-x-auto">
+													<div className="min-w-[820px] flex gap-1">
+														{Array.from({ length: 18 }, (_, i) => (
+															<div key={`${id}-h-${i}`} className="flex flex-col items-center">
+																<div className="text-[10px] text-slate-500">{i + 1}</div>
+																<input
+																	defaultValue={scores[i] == null ? "" : String(scores[i])}
+																	disabled={disabled}
+																	inputMode="numeric"
+																	className="w-10 p-2 text-center bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200 disabled:opacity-60"
+																	onBlur={(e) => {
+																		const next = [...scores];
+																		const raw = e.target.value.trim();
+																		next[i] = raw ? safeIntString(raw) : null;
+																		saveTeam(id, { ...data, scores: next });
+																	}}
+																/>
+															</div>
+														))}
+													</div>
+												</div>
+											</td>
+											</tr>
+										</>
 									);
 								})}
 							</tbody>
