@@ -189,6 +189,12 @@ export default function GroupPage() {
 							{players.length ? `${players.length} players` : "No players yet"} · {saving ? "Saving…" : "Saved"}
 						</p>
 					</div>
+					<button
+						onClick={() => router.push(`/group/${groupId}/score`)}
+						className="bg-emerald-600 hover:bg-emerald-500 px-5 py-2.5 rounded-xl font-semibold text-sm flex items-center gap-2"
+					>
+						⛳ Start Scoring
+					</button>
 				</div>
 
 				{players.length === 0 ? (
