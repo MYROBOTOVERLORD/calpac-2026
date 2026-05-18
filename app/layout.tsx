@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -28,16 +27,6 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased relative`}
       >
-        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
-          <Image
-            src="/calp-logo.svg"
-            alt="Cal-Pacific Golf Classic 38"
-            width={140}
-            height={140}
-            priority
-            className="w-[98px] h-[98px] sm:w-[140px] sm:h-[140px]"
-          />
-        </div>
         {children}
       </body>
     </html>
