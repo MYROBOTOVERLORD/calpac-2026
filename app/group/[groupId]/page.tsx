@@ -859,30 +859,38 @@ export default function GroupPage() {
 								{players.length ? `${players.length} players` : "No players yet"} · {saving ? "Saving…" : "Saved"}
 							</p>
 						</div>
-					</div>
+					{players.length > 0 && (
+						<button
+							onClick={() => router.push(`/group/${groupId}/score`)}
+							className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2.5 rounded-xl font-semibold text-sm flex items-center gap-2 self-start"
+						>
+							⛳ Start Scoring
+						</button>
+					)}
+				</div>
 
-					{players.length ? (
-						<div className="mt-5 flex items-center justify-between gap-3 flex-wrap">
-							<div className="inline-flex rounded-lg border border-sky-200 overflow-hidden bg-white/70">
-								<button
-									onClick={() => setSelectedDay("day1")}
-									className={`px-4 py-2 text-sm ${selectedDay === "day1" ? "bg-sky-600 text-white" : "bg-white/60 hover:bg-white"}`}
-								>
-									Day 1
-								</button>
-								<button
-									onClick={() => setSelectedDay("day2")}
-									className={`px-4 py-2 text-sm ${selectedDay === "day2" ? "bg-sky-600 text-white" : "bg-white/60 hover:bg-white"}`}
-								>
-									Day 2
-								</button>
-							</div>
-							<div className="text-sm text-slate-700">
-								<p>Course: {courseName}</p>
-								{isDay1LockedView ? <p className="text-xs text-slate-600 mt-0.5">Day 1 locked by admin.</p> : null}
-							</div>
+				{players.length ? (
+					<div className="mt-5 flex items-center justify-between gap-3 flex-wrap">
+						<div className="inline-flex rounded-lg border border-sky-200 overflow-hidden bg-white/70">
+							<button
+								onClick={() => setSelectedDay("day1")}
+								className={`px-4 py-2 text-sm ${selectedDay === "day1" ? "bg-sky-600 text-white" : "bg-white/60 hover:bg-white"}`}
+							>
+								Day 1
+							</button>
+							<button
+								onClick={() => setSelectedDay("day2")}
+								className={`px-4 py-2 text-sm ${selectedDay === "day2" ? "bg-sky-600 text-white" : "bg-white/60 hover:bg-white"}`}
+							>
+								Day 2
+							</button>
 						</div>
-					) : null}
+						<div className="text-sm text-slate-700">
+							<p>Course: {courseName}</p>
+							{isDay1LockedView ? <p className="text-xs text-slate-600 mt-0.5">Day 1 locked by admin.</p> : null}
+						</div>
+					</div>
+				) : null}
 
 					{players.length === 0 ? (
 						<div className="mt-6 bg-white/80 border border-sky-200 rounded-2xl p-5">
