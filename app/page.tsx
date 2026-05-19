@@ -37,7 +37,7 @@ export default function Home() {
       }
 
       const docSnap = snap.docs[0];
-      router.push(`/group/${docSnap.id}`);
+      router.push(`/group/${docSnap.id}/score`);
     } catch {
       setError("Could not check PIN. Verify Firestore is enabled and try again.");
     } finally {

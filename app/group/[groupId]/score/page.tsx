@@ -13,32 +13,118 @@ import { getCourseForDay, type HoleData, type CourseData } from "@/lib/courses";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
+type DayKey = "day1" | "day2";
+type TeeKey = "combo" | "three" | "four" | "stampede" | "tips";
+type ContestWinnerNote = { winner?: string | null; note?: string | null };
+type ContestEntry = { hole?: number | null; winner?: string | null; note?: string | null };
+type LeaderRow = { player: string; gross: number; net: number; toPar: number | null };
+
 type GroupDoc = {
   groupName?: string;
   groupname?: string;
-  day?: 1 | 2;
   playerNames?: string[];
-  handicaps?: Record<string, number>;
-  scores?: Record<string, Array<number | null>>;
+  playerNamesByDay?: { day1?: string[]; day2?: string[] };
+  scores?:
+    | Record<string, Array<number | null>>
+    | { day1?: Record<string, Array<number | null>>; day2?: Record<string, Array<number | null>> };
+  handicaps?: Record<string, number | null>;
+  day2HandicapAdjustments?: Record<string, number | null>;
+  teeChoices?: { day1?: Record<string, TeeKey | null>; day2?: Record<string, TeeKey | null> };
+  day1ScoresLocked?: boolean;
+  charityStrokes?: Record<string, number | null>;
+  treeStrokes?: Record<string, number | null>;
+  contest?: {
+    day1?: { closestToPinByHole?: Record<string, ContestWinnerNote>; closestToPin?: ContestEntry; longestDrive?: ContestEntry };
+    day2?: { closestToPinByHole?: Record<string, ContestWinnerNote>; closestToPin?: ContestEntry; longestDrive?: ContestEntry };
+  };
+  tournament?: {
+    day1Course?: string;
+    day2Course?: string;
+    day1Pars?: number[];
+    day2Pars?: number[];
+    day1Hcps?: number[];
+    day2Hcps?: number[];
+  };
 };
 
 const HOLE_COUNT = 18;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function coerceScores(
-  players: string[],
-  input?: GroupDoc["scores"]
-): Record<string, Array<number | null>> {
+function coerceScoreTable(players: string[], input?: Record<string, Array<number | null>> | null) {
   const next: Record<string, Array<number | null>> = {};
-  for (const player of players) {
-    const existing = input?.[player];
-    next[player] = Array.from({ length: HOLE_COUNT }, (_, i) => {
+  for (const p of players) {
+    const existing = input?.[p];
+    next[p] = Array.from({ length: HOLE_COUNT }, (_, i) => {
       const v = Array.isArray(existing) ? existing[i] : undefined;
       return typeof v === "number" && Number.isFinite(v) ? v : null;
     });
   }
   return next;
+}
+
+function coerceScoresByDay(players: string[], input?: GroupDoc["scores"]) {
+  const raw = input as Record<string, unknown>;
+  const isOld = input && typeof input === "object" && !("day1" in raw) && !("day2" in raw);
+  return {
+    day1: coerceScoreTable(players, isOld ? (input as Record<string, Array<number | null>>) : (raw?.day1 as Record<string, Array<number | null>> | null)),
+    day2: coerceScoreTable(players, isOld ? null : (raw?.day2 as Record<string, Array<number | null>> | null)),
+  };
+}
+
+function coerceNumberMap(players: string[], input?: Record<string, number | null> | null, def = 0) {
+  const next: Record<string, number> = {};
+  for (const p of players) {
+    const v = input?.[p];
+    next[p] = typeof v === "number" && Number.isFinite(v) ? v : def;
+  }
+  return next;
+}
+
+function coerceTeeMap(players: string[], input?: Record<string, TeeKey | null> | null, def: TeeKey = "combo") {
+  const next: Record<string, TeeKey> = {};
+  for (const p of players) {
+    const v = input?.[p];
+    next[p] = v === "three" || v === "four" || v === "combo" || v === "stampede" || v === "tips" ? v : def;
+  }
+  return next;
+}
+
+function teeBonusForDay(day: DayKey, tee?: TeeKey | null): number {
+  return day === "day1" && tee === "three" ? 1 : day === "day1" && tee === "four" ? 2 : 0;
+}
+
+function arrSum(arr: Array<number | null>): number {
+  return arr.reduce<number>((a, v) => (typeof v === "number" ? a + v : a), 0);
+}
+
+function isCompleteRound(arr?: Array<number | null>): boolean {
+  return !!arr && arr.length === HOLE_COUNT && arr.every((v) => typeof v === "number");
+}
+
+function strokesForHole(idx: number, total: number): number {
+  const s = Math.floor(total);
+  if (!Number.isFinite(idx) || idx < 1 || idx > 18 || s <= 0) return 0;
+  if (s < idx) return 0;
+  return 1 + Math.floor((s - idx) / 18);
+}
+
+function netRunning(scores: Array<number | null>, hcps: number[] | null, total: number): number {
+  const gross = arrSum(scores);
+  if (!hcps || hcps.length !== HOLE_COUNT) return isCompleteRound(scores) ? gross - Math.floor(total) : gross;
+  return gross - scores.reduce<number>((acc, v, i) => (typeof v === "number" ? acc + strokesForHole(hcps[i], total) : acc), 0);
+}
+
+function toParSoFar(scores: Array<number | null>, pars: number[] | null): number | null {
+  if (!pars || pars.length !== HOLE_COUNT) return null;
+  let g = 0, p = 0, n = 0;
+  scores.forEach((v, i) => { if (typeof v === "number") { g += v; p += pars[i] ?? 0; n++; } });
+  return n === 0 ? null : g - p;
+}
+
+function applyCharity(net: number, scores: Array<number | null>, charity: number): number {
+  const c = Math.floor(charity);
+  return c > 0 && isCompleteRound(scores) ? net - c : net;
 }
 
 function getScoreLabel(score: number | null, par: number): string {
@@ -55,19 +141,17 @@ function getScoreLabel(score: number | null, par: number): string {
 function getScoreColor(score: number | null, par: number): string {
   if (score === null) return "bg-zinc-700 text-zinc-400";
   const diff = score - par;
-  if (diff <= -2) return "bg-yellow-400 text-zinc-900";   // Eagle
-  if (diff === -1) return "bg-red-500 text-white";         // Birdie
-  if (diff === 0) return "bg-emerald-600 text-white";      // Par
-  if (diff === 1) return "bg-zinc-600 text-white";         // Bogey
-  if (diff === 2) return "bg-zinc-700 text-zinc-300";      // Double
-  return "bg-zinc-800 text-zinc-400";                      // Worse
+  if (diff <= -2) return "bg-yellow-400 text-zinc-900";
+  if (diff === -1) return "bg-red-500 text-white";
+  if (diff === 0) return "bg-emerald-600 text-white";
+  if (diff === 1) return "bg-zinc-600 text-white";
+  if (diff === 2) return "bg-zinc-700 text-zinc-300";
+  return "bg-zinc-800 text-zinc-400";
 }
 
-function netScore(gross: number | null, handicap: number, holeHandicap: number): number | null {
-  if (gross === null) return null;
-  const base = Math.floor(handicap / HOLE_COUNT);
-  const extra = holeHandicap <= (handicap % HOLE_COUNT) ? 1 : 0;
-  return gross - base - extra;
+function fmtToPar(v: number | null): string {
+  if (v == null) return "—";
+  return v === 0 ? "E" : v < 0 ? String(v) : `+${v}`;
 }
 
 // ─── Green Popup ─────────────────────────────────────────────────────────────
@@ -142,10 +226,12 @@ function GreenPopup({ hole, course, onClose }: {
 function ScoreButton({
   value,
   par,
+  disabled,
   onChange,
 }: {
   value: number | null;
   par: number;
+  disabled?: boolean;
   onChange: (v: number | null) => void;
 }) {
   const [editing, setEditing] = useState(false);
@@ -153,6 +239,7 @@ function ScoreButton({
   const inputRef = useRef<HTMLInputElement>(null);
 
   function startEdit() {
+    if (disabled) return;
     setDraft(value !== null ? String(value) : "");
     setEditing(true);
     setTimeout(() => inputRef.current?.focus(), 50);
@@ -164,7 +251,7 @@ function ScoreButton({
     setEditing(false);
   }
 
-  const colorClass = getScoreColor(value, par);
+  const colorClass = disabled ? "bg-zinc-800 text-zinc-600 cursor-not-allowed" : getScoreColor(value, par);
   const label = getScoreLabel(value, par);
 
   if (editing) {
@@ -209,84 +296,165 @@ export default function ScoringPage() {
   const router = useRouter();
 
   const [group, setGroup] = useState<GroupDoc | null>(null);
-  const [scores, setScores] = useState<Record<string, Array<number | null>>>({});
-  const [currentHole, setCurrentHole] = useState(0); // 0-indexed
+  const [selectedDay, setSelectedDay] = useState<DayKey>("day1");
+  const [scoresByDay, setScoresByDay] = useState<{
+    day1: Record<string, Array<number | null>>;
+    day2: Record<string, Array<number | null>>;
+  }>({ day1: {}, day2: {} });
+  const [handicaps, setHandicaps] = useState<Record<string, number>>({});
+  const [day2Adjustments, setDay2Adjustments] = useState<Record<string, number>>({});
+  const [teeChoicesByDay, setTeeChoicesByDay] = useState<{ day1: Record<string, TeeKey>; day2: Record<string, TeeKey> }>({ day1: {}, day2: {} });
+  const [charityStrokes, setCharityStrokes] = useState<Record<string, number>>({});
+  const [treeStrokes, setTreeStrokes] = useState<Record<string, number>>({});
+  const [currentHole, setCurrentHole] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [showGreen, setShowGreen] = useState(false);
-  const [showNetScores, setShowNetScores] = useState(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const course: CourseData = useMemo(
-    () => getCourseForDay((group?.day ?? 1) as 1 | 2),
-    [group?.day]
-  );
+  const title = group?.groupName ?? group?.groupname ?? "Foursome";
 
-  const hole: HoleData = course.holes[currentHole];
-  const players = useMemo(
-    () => (group?.playerNames ?? []).filter(Boolean),
-    [group?.playerNames]
+  const playersDay1 = useMemo(() => {
+    const d = group?.playerNamesByDay?.day1;
+    const l = group?.playerNames;
+    return ((Array.isArray(d) ? d : Array.isArray(l) ? l : []) as string[]).filter(Boolean);
+  }, [group?.playerNames, group?.playerNamesByDay?.day1]);
+
+  const playersDay2 = useMemo(() => {
+    const d = group?.playerNamesByDay?.day2;
+    const l = group?.playerNames;
+    return ((Array.isArray(d) ? d : Array.isArray(l) ? l : []) as string[]).filter(Boolean);
+  }, [group?.playerNames, group?.playerNamesByDay?.day2]);
+
+  const players = selectedDay === "day1" ? playersDay1 : playersDay2;
+  const scores = scoresByDay[selectedDay];
+  const isDay1Locked = selectedDay === "day1" && !!group?.day1ScoresLocked;
+
+  const course: CourseData = useMemo(
+    () => getCourseForDay(selectedDay === "day1" ? 1 : 2),
+    [selectedDay]
   );
-  const handicaps = group?.handicaps ?? {};
+  const hole: HoleData = course.holes[currentHole];
+
+  const dayPars = useMemo(() => {
+    const p = selectedDay === "day1" ? group?.tournament?.day1Pars : group?.tournament?.day2Pars;
+    return Array.isArray(p) && p.length === HOLE_COUNT ? p : null;
+  }, [group?.tournament, selectedDay]);
+
+  const dayHcps = useMemo(() => {
+    const h = selectedDay === "day1" ? group?.tournament?.day1Hcps : group?.tournament?.day2Hcps;
+    return Array.isArray(h) && h.length === HOLE_COUNT ? h : null;
+  }, [group?.tournament, selectedDay]);
+
+  const par3Holes = useMemo(() => {
+    if (!dayPars) return [] as number[];
+    return dayPars.map((p, i) => (p === 3 ? i + 1 : null)).filter((v): v is number => v !== null);
+  }, [dayPars]);
 
   const runningTotals = useMemo(() => {
     const t: Record<string, number> = {};
     for (const p of players) {
-      t[p] = (scores[p] ?? [])
-        .slice(0, currentHole + 1)
-        .reduce<number>((acc, v) => (typeof v === "number" ? acc + v : acc), 0);
+      t[p] = (scores[p] ?? []).slice(0, currentHole + 1).reduce<number>((a, v) => (typeof v === "number" ? a + v : a), 0);
     }
     return t;
   }, [players, scores, currentHole]);
 
-  const parThrough = useMemo(
-    () => course.holes.slice(0, currentHole + 1).reduce((acc, h) => acc + h.par, 0),
-    [course.holes, currentHole]
-  );
+  const parThrough = useMemo(() => {
+    if (dayPars) return dayPars.slice(0, currentHole + 1).reduce((a, p) => a + p, 0);
+    return course.holes.slice(0, currentHole + 1).reduce((a, h) => a + h.par, 0);
+  }, [course.holes, currentHole, dayPars]);
+
+  const grossTotals = useMemo(() => {
+    const t: Record<string, number> = {};
+    for (const p of players) t[p] = arrSum(scores[p] ?? []);
+    return t;
+  }, [players, scores]);
+
+  const netTotals = useMemo(() => {
+    const t: Record<string, number> = {};
+    for (const p of players) {
+      const base = handicaps[p] ?? 0;
+      const adj = selectedDay === "day2" ? (day2Adjustments[p] ?? 0) : 0;
+      const teeBonus = teeBonusForDay(selectedDay, teeChoicesByDay[selectedDay]?.[p]);
+      const charity = (charityStrokes[p] ?? 0) + (treeStrokes[p] ?? 0);
+      const net = netRunning(scores[p] ?? Array.from({ length: HOLE_COUNT }, () => null), dayHcps, base + adj + teeBonus);
+      t[p] = applyCharity(net, scores[p] ?? [], charity);
+    }
+    return t;
+  }, [charityStrokes, day2Adjustments, dayHcps, handicaps, players, scores, selectedDay, teeChoicesByDay, treeStrokes]);
+
+  const day1Leaderboard = useMemo((): LeaderRow[] => {
+    const pars = group?.tournament?.day1Pars ?? null;
+    const hcps = group?.tournament?.day1Hcps;
+    const hcpsValid = Array.isArray(hcps) && hcps.length === HOLE_COUNT ? hcps : null;
+    const parsValid = Array.isArray(pars) && pars.length === HOLE_COUNT ? pars : null;
+    const rows = playersDay1.map((p): LeaderRow => {
+      const s = scoresByDay.day1[p] ?? Array.from({ length: HOLE_COUNT }, () => null);
+      const hcp = handicaps[p] ?? 0;
+      const teeBonus = teeBonusForDay("day1", teeChoicesByDay.day1?.[p]);
+      const charity = (charityStrokes[p] ?? 0) + (treeStrokes[p] ?? 0);
+      const net = applyCharity(netRunning(s, hcpsValid, hcp + teeBonus), s, charity);
+      return { player: p, gross: arrSum(s), net, toPar: toParSoFar(s, parsValid) };
+    });
+    return rows.sort((a, b) => a.net - b.net || a.gross - b.gross);
+  }, [charityStrokes, group?.tournament?.day1Hcps, group?.tournament?.day1Pars, handicaps, playersDay1, scoresByDay.day1, teeChoicesByDay.day1, treeStrokes]);
+
+  const day2Leaderboard = useMemo((): LeaderRow[] => {
+    const pars = group?.tournament?.day2Pars ?? null;
+    const hcps = group?.tournament?.day2Hcps;
+    const hcpsValid = Array.isArray(hcps) && hcps.length === HOLE_COUNT ? hcps : null;
+    const parsValid = Array.isArray(pars) && pars.length === HOLE_COUNT ? pars : null;
+    const rows = playersDay2.map((p): LeaderRow => {
+      const s = scoresByDay.day2[p] ?? Array.from({ length: HOLE_COUNT }, () => null);
+      const hcp = handicaps[p] ?? 0;
+      const adj = day2Adjustments[p] ?? 0;
+      const teeBonus = teeBonusForDay("day2", teeChoicesByDay.day2?.[p]);
+      const charity = (charityStrokes[p] ?? 0) + (treeStrokes[p] ?? 0);
+      const net = applyCharity(netRunning(s, hcpsValid, hcp + adj + teeBonus), s, charity);
+      return { player: p, gross: arrSum(s), net, toPar: toParSoFar(s, parsValid) };
+    });
+    return rows.sort((a, b) => a.net - b.net || a.gross - b.gross);
+  }, [charityStrokes, day2Adjustments, group?.tournament?.day2Hcps, group?.tournament?.day2Pars, handicaps, playersDay2, scoresByDay.day2, teeChoicesByDay.day2, treeStrokes]);
 
   useEffect(() => {
     if (!groupId) return;
     setLoading(true);
-
     const unsub = onSnapshot(
       doc(db, "groups", groupId),
       (snap) => {
-        if (!snap.exists()) {
-          setError("Group not found.");
-          setLoading(false);
-          return;
-        }
+        if (!snap.exists()) { setError("Group not found."); setLoading(false); return; }
         const data = snap.data() as GroupDoc;
         setGroup(data);
-        const nextPlayers = (data.playerNames ?? []).filter(Boolean);
-        setScores((prev) => {
-          const same = nextPlayers.join(",") === Object.keys(prev).join(",");
-          return same ? prev : coerceScores(nextPlayers, data.scores);
+        const legacy = (data.playerNames ?? []).filter(Boolean);
+        const d1 = ((data.playerNamesByDay?.day1 ?? legacy) as string[]).filter(Boolean);
+        const d2 = ((data.playerNamesByDay?.day2 ?? legacy) as string[]).filter(Boolean);
+        const all = [...new Set([...d1, ...d2])];
+        setScoresByDay(coerceScoresByDay(all, data.scores));
+        setHandicaps(coerceNumberMap(all, data.handicaps ?? null, 0));
+        setDay2Adjustments(coerceNumberMap(all, data.day2HandicapAdjustments ?? null, 0));
+        setTeeChoicesByDay({
+          day1: coerceTeeMap(all, data.teeChoices?.day1 ?? null, "combo"),
+          day2: coerceTeeMap(all, data.teeChoices?.day2 ?? null, "combo"),
         });
+        setCharityStrokes(coerceNumberMap(all, data.charityStrokes ?? null, 0));
+        setTreeStrokes(coerceNumberMap(all, data.treeStrokes ?? null, 0));
         setLoading(false);
       },
-      () => {
-        setError("Failed to connect. Check your connection.");
-        setLoading(false);
-      }
+      () => { setError("Failed to connect."); setLoading(false); }
     );
-
     return () => unsub();
   }, [groupId]);
 
-  function scheduleSave(nextScores: Record<string, Array<number | null>>) {
+  function scheduleSave(next: typeof scoresByDay) {
     if (!groupId) return;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(async () => {
       setSaving(true);
       try {
-        await updateDoc(doc(db, "groups", groupId), {
-          scores: nextScores,
-          updatedAt: serverTimestamp(),
-        });
+        await updateDoc(doc(db, "groups", groupId), { scores: next, updatedAt: serverTimestamp() });
       } catch {
-        setError("Save failed. Check connection and try again.");
+        setError("Save failed.");
       } finally {
         setSaving(false);
       }
@@ -294,19 +462,15 @@ export default function ScoringPage() {
   }
 
   function handleScoreChange(player: string, holeIdx: number, value: number | null) {
-    const nextScores = {
+    if (isDay1Locked) return;
+    const nextDayScores = {
       ...scores,
-      [player]: Object.assign(
-        Array.from({ length: HOLE_COUNT }, (_, i) => scores[player]?.[i] ?? null),
-        { [holeIdx]: value }
-      ),
+      [player]: Array.from({ length: HOLE_COUNT }, (_, i) => (i === holeIdx ? value : (scores[player]?.[i] ?? null))),
     };
-    setScores(nextScores);
-    scheduleSave(nextScores);
+    const next = { ...scoresByDay, [selectedDay]: nextDayScores };
+    setScoresByDay(next);
+    scheduleSave(next);
   }
-
-  function prevHole() { setCurrentHole((h) => Math.max(0, h - 1)); }
-  function nextHole() { setCurrentHole((h) => Math.min(HOLE_COUNT - 1, h + 1)); }
 
   if (loading) {
     return (
@@ -324,9 +488,7 @@ export default function ScoringPage() {
       <main className="min-h-screen bg-zinc-950 flex items-center justify-center p-6">
         <div className="text-center">
           <p className="text-red-400 mb-4">{error}</p>
-          <button onClick={() => router.push("/")} className="text-sm text-zinc-400 underline">
-            Back to PIN entry
-          </button>
+          <button onClick={() => router.push("/")} className="text-sm text-zinc-400 underline">Back to PIN entry</button>
         </div>
       </main>
     );
@@ -336,29 +498,43 @@ export default function ScoringPage() {
     return (
       <main className="min-h-screen bg-zinc-950 flex items-center justify-center p-6">
         <div className="text-center text-zinc-400">
-          <p className="mb-2">No players assigned to this group yet.</p>
-          <button
-            onClick={() => router.push(`/group/${groupId}`)}
-            className="text-sm text-emerald-400 underline"
-          >
-            Go to group setup
+          <p className="mb-4">No players assigned to this group yet.</p>
+          <button onClick={() => router.push(`/group/${groupId}/admin`)} className="text-sm text-emerald-400 underline">
+            Open admin
           </button>
         </div>
       </main>
     );
   }
 
+  const contestDay = group?.contest?.[selectedDay];
+  const ctpByHole = contestDay?.closestToPinByHole ?? {};
+  const ctpEntries = par3Holes.map((h) => ({ hole: h, entry: ctpByHole[String(h)] })).filter((x) => x.entry?.winner || x.entry?.note);
+  const legacyCtp = contestDay?.closestToPin;
+  const longestDrive = contestDay?.longestDrive;
+  const day1CourseName = group?.tournament?.day1Course ?? "Old Greenwood";
+  const day2CourseName = group?.tournament?.day2Course ?? "Grays Crossing";
+
   return (
     <>
-      {showGreen && (
-        <GreenPopup
-          hole={hole}
-          course={course}
-          onClose={() => setShowGreen(false)}
-        />
-      )}
+      {showGreen && <GreenPopup hole={hole} course={course} onClose={() => setShowGreen(false)} />}
 
-      <main className="min-h-screen bg-zinc-950 text-white flex flex-col max-w-lg mx-auto">
+      <main className="min-h-screen bg-zinc-950 text-white max-w-lg mx-auto pb-8">
+
+        {/* ── Day Selector ── */}
+        <div className="flex gap-2 px-4 pt-4 pb-2">
+          {(["day1", "day2"] as DayKey[]).map((d) => (
+            <button
+              key={d}
+              onClick={() => setSelectedDay(d)}
+              className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-colors ${
+                selectedDay === d ? "bg-emerald-600 text-white" : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"
+              }`}
+            >
+              {d === "day1" ? `Day 1 · ${day1CourseName.split(" ")[0]}` : `Day 2 · ${day2CourseName.split(" ")[0]}`}
+            </button>
+          ))}
+        </div>
 
         {/* ── Hero Image ── */}
         <div className="relative w-full aspect-[16/9] bg-zinc-900 overflow-hidden">
@@ -369,19 +545,8 @@ export default function ScoringPage() {
           />
           <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/80" />
 
-          <div className="absolute top-0 inset-x-0 flex items-center justify-between px-4 pt-4">
-            <button
-              onClick={() => router.push(`/group/${groupId}`)}
-              className="flex items-center gap-1.5 bg-black/50 backdrop-blur-sm rounded-full px-3 py-1.5 text-xs text-zinc-300 hover:text-white transition-colors"
-            >
-              ← Scorecard
-            </button>
-            <button
-              onClick={() => router.push("/leaderboard")}
-              className="flex items-center gap-1.5 bg-black/50 backdrop-blur-sm rounded-full px-3 py-1.5 text-xs text-zinc-300 hover:text-white transition-colors"
-            >
-              🏆 Leaderboard
-            </button>
+          <div className="absolute top-0 inset-x-0 flex items-center justify-between px-4 pt-3">
+            <div className="bg-black/50 backdrop-blur-sm rounded-full px-3 py-1.5 text-xs text-zinc-300">{title}</div>
             <div className="bg-black/50 backdrop-blur-sm rounded-full px-3 py-1.5 text-xs text-zinc-300">
               {course.shortName} · {saving ? "Saving…" : "Saved"}
             </div>
@@ -390,19 +555,11 @@ export default function ScoringPage() {
           <div className="absolute bottom-0 inset-x-0 px-4 pb-4">
             <div className="flex items-end justify-between">
               <div>
-                <p className="text-xs font-semibold tracking-widest text-emerald-400 uppercase mb-1">
-                  {course.name}
-                </p>
-                <h1 className="text-4xl font-black tracking-tight leading-none">
-                  Hole {hole.hole}
-                </h1>
+                <p className="text-xs font-semibold tracking-widest text-emerald-400 uppercase mb-1">{course.name}</p>
+                <h1 className="text-4xl font-black tracking-tight leading-none">Hole {hole.hole}</h1>
                 <div className="flex items-center gap-3 mt-2">
-                  <span className="bg-white/20 backdrop-blur-sm rounded-full px-3 py-1 text-sm font-semibold">
-                    Par {hole.par}
-                  </span>
-                  <span className="bg-white/20 backdrop-blur-sm rounded-full px-3 py-1 text-sm font-semibold">
-                    Hdcp {hole.handicap}
-                  </span>
+                  <span className="bg-white/20 backdrop-blur-sm rounded-full px-3 py-1 text-sm font-semibold">Par {hole.par}</span>
+                  <span className="bg-white/20 backdrop-blur-sm rounded-full px-3 py-1 text-sm font-semibold">Hdcp {hole.handicap}</span>
                   <span className="bg-white/20 backdrop-blur-sm rounded-full px-3 py-1 text-sm font-semibold">
                     {hole.tees[1]?.yardage ?? hole.tees[0]?.yardage} yds
                   </span>
@@ -420,28 +577,24 @@ export default function ScoringPage() {
         </div>
 
         {/* ── Score Inputs ── */}
-        <div className="flex-1 px-4 pt-5 pb-4">
-          <div className="flex items-center justify-between mb-4">
-            <p className="text-sm font-semibold text-zinc-400">
-              {group?.groupName ?? group?.groupname ?? "Foursome"}
-            </p>
-            <button
-              onClick={() => setShowNetScores((v) => !v)}
-              className={`text-xs font-semibold px-3 py-1.5 rounded-full transition-colors ${
-                showNetScores ? "bg-emerald-600 text-white" : "bg-zinc-800 text-zinc-400"
-              }`}
-            >
-              {showNetScores ? "Net" : "Gross"}
-            </button>
-          </div>
+        <div className="px-4 pt-5 pb-2">
+          {isDay1Locked && (
+            <div className="mb-3 bg-yellow-900/30 border border-yellow-800/40 rounded-xl px-3 py-2 text-xs text-yellow-400">
+              Day 1 scores are locked by admin
+            </div>
+          )}
 
           <div className="space-y-3">
             {players.map((player) => {
               const gross = scores[player]?.[currentHole] ?? null;
               const hdcp = handicaps[player] ?? 0;
-              const net = showNetScores ? netScore(gross, hdcp, hole.handicap) : null;
-              const runningTotal = runningTotals[player] ?? 0;
-              const diff = runningTotal - parThrough;
+              const adj = selectedDay === "day2" ? (day2Adjustments[player] ?? 0) : 0;
+              const teeBonus = teeBonusForDay(selectedDay, teeChoicesByDay[selectedDay]?.[player]);
+              const hcpIdx = dayHcps?.[currentHole] ?? hole.handicap;
+              const holeStrokes = strokesForHole(hcpIdx, hdcp + adj + teeBonus);
+              const netHole = gross !== null ? gross - holeStrokes : null;
+              const rt = runningTotals[player] ?? 0;
+              const diff = rt - parThrough;
 
               return (
                 <div key={player} className="flex items-center gap-4 bg-zinc-900 rounded-2xl px-4 py-3">
@@ -455,12 +608,22 @@ export default function ScoringPage() {
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="text-xs text-zinc-500">Total</p>
-                    <p className="text-lg font-bold">{runningTotal || "—"}</p>
+                    {holeStrokes > 0 ? (
+                      <>
+                        <p className="text-xs text-zinc-500">Net hole</p>
+                        <p className="text-sm font-bold">{netHole ?? "—"}</p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-xs text-zinc-500">Total</p>
+                        <p className="text-lg font-bold">{rt || "—"}</p>
+                      </>
+                    )}
                   </div>
                   <ScoreButton
                     value={gross}
                     par={hole.par}
+                    disabled={isDay1Locked}
                     onChange={(v) => handleScoreChange(player, currentHole, v)}
                   />
                 </div>
@@ -469,29 +632,23 @@ export default function ScoringPage() {
           </div>
 
           {hole.description && (
-            <div className="mt-4 bg-zinc-900/60 rounded-2xl px-4 py-3">
+            <div className="mt-3 bg-zinc-900/60 rounded-2xl px-4 py-3">
               <p className="text-xs text-zinc-500 italic leading-relaxed">{hole.description}</p>
             </div>
           )}
         </div>
 
         {/* ── Navigation ── */}
-        <div className="sticky bottom-0 bg-zinc-950/95 backdrop-blur-sm border-t border-zinc-800 px-4 py-4">
+        <div className="px-4 py-4 border-t border-zinc-800 mt-3">
           <div className="flex justify-center gap-1.5 mb-4">
-            {course.holes.map((h, i) => {
-              const allScored = players.every(
-                (p) => scores[p]?.[i] !== null && scores[p]?.[i] !== undefined
-              );
+            {course.holes.map((_, i) => {
+              const done = players.every((p) => scores[p]?.[i] != null);
               return (
                 <button
                   key={i}
                   onClick={() => setCurrentHole(i)}
                   className={`transition-all rounded-full ${
-                    i === currentHole
-                      ? "w-6 h-2.5 bg-emerald-400"
-                      : allScored
-                      ? "w-2.5 h-2.5 bg-emerald-700"
-                      : "w-2.5 h-2.5 bg-zinc-700"
+                    i === currentHole ? "w-6 h-2.5 bg-emerald-400" : done ? "w-2.5 h-2.5 bg-emerald-700" : "w-2.5 h-2.5 bg-zinc-700"
                   }`}
                 />
               );
@@ -500,7 +657,7 @@ export default function ScoringPage() {
 
           <div className="flex items-center gap-3">
             <button
-              onClick={prevHole}
+              onClick={() => setCurrentHole((h) => Math.max(0, h - 1))}
               disabled={currentHole === 0}
               className="flex-1 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-30 disabled:cursor-not-allowed rounded-2xl py-4 font-semibold text-sm transition-colors active:scale-95 flex items-center justify-center gap-2"
             >
@@ -511,13 +668,173 @@ export default function ScoringPage() {
               <p className="text-xs text-zinc-500">of 18</p>
             </div>
             <button
-              onClick={nextHole}
+              onClick={() => setCurrentHole((h) => Math.min(HOLE_COUNT - 1, h + 1))}
               disabled={currentHole === HOLE_COUNT - 1}
               className="flex-1 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-30 disabled:cursor-not-allowed rounded-2xl py-4 font-semibold text-sm transition-colors active:scale-95 flex items-center justify-center gap-2"
             >
               Hole {currentHole < HOLE_COUNT - 1 ? currentHole + 2 : "—"} →
             </button>
           </div>
+        </div>
+
+        {/* ── Player Totals ── */}
+        <section className="px-4 mt-6">
+          <h2 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-3">
+            Player Totals · {selectedDay === "day1" ? "Day 1" : "Day 2"}
+          </h2>
+          <div className="bg-zinc-900 rounded-2xl divide-y divide-zinc-800">
+            {players.map((p) => {
+              const adj = selectedDay === "day2" ? (day2Adjustments[p] ?? 0) : 0;
+              const teeBonus = teeBonusForDay(selectedDay, teeChoicesByDay[selectedDay]?.[p]);
+              const charity = (charityStrokes[p] ?? 0) + (treeStrokes[p] ?? 0);
+              const effectiveHcp = (handicaps[p] ?? 0) + adj + teeBonus;
+              return (
+                <div key={p} className="flex items-center px-4 py-3 gap-4">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-white truncate">{p}</p>
+                    <p className="text-xs text-zinc-500 mt-0.5">
+                      Hcp {effectiveHcp}{charity > 0 ? ` · +${charity} bonus strokes` : ""}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-zinc-500">Gross</p>
+                    <p className="text-base font-bold text-white">{grossTotals[p] || "—"}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-zinc-500">Net</p>
+                    <p className="text-base font-bold text-emerald-400">{netTotals[p] || "—"}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* ── Contests ── */}
+        <section className="px-4 mt-6">
+          <h2 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-3">
+            Contests · {selectedDay === "day1" ? "Day 1" : "Day 2"}
+          </h2>
+          <div className="bg-zinc-900 rounded-2xl p-4 space-y-4">
+            <div>
+              <p className="text-xs font-semibold text-zinc-400 mb-2">
+                ⛳ Closest to the Pin{par3Holes.length ? ` · Par 3s: Holes ${par3Holes.join(", ")}` : ""}
+              </p>
+              {ctpEntries.length > 0 ? (
+                <div className="space-y-1.5">
+                  {ctpEntries.map(({ hole: h, entry }) => (
+                    <div key={h} className="flex items-center justify-between bg-zinc-800 rounded-xl px-3 py-2">
+                      <span className="text-xs text-zinc-400">Hole {h}</span>
+                      <span className="text-sm font-semibold text-white">{entry?.winner}</span>
+                      {entry?.note && <span className="text-xs text-emerald-400">{entry.note}</span>}
+                    </div>
+                  ))}
+                </div>
+              ) : legacyCtp?.winner ? (
+                <div className="flex items-center gap-3 bg-zinc-800 rounded-xl px-3 py-2">
+                  {legacyCtp.hole != null && <span className="text-xs text-zinc-400">Hole {legacyCtp.hole}</span>}
+                  <span className="text-sm font-semibold text-white flex-1">{legacyCtp.winner}</span>
+                  {legacyCtp.note && <span className="text-xs text-emerald-400">{legacyCtp.note}</span>}
+                </div>
+              ) : (
+                <p className="text-xs text-zinc-600 italic">Results posted by admin after the round</p>
+              )}
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold text-zinc-400 mb-2">💨 Longest Drive</p>
+              {longestDrive?.winner ? (
+                <div className="bg-zinc-800 rounded-xl px-3 py-2">
+                  <span className="text-sm font-semibold text-white">{longestDrive.winner}</span>
+                </div>
+              ) : (
+                <p className="text-xs text-zinc-600 italic">Results posted by admin after the round</p>
+              )}
+            </div>
+          </div>
+        </section>
+
+        {/* ── Leaderboard ── */}
+        <section className="px-4 mt-6">
+          <h2 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-3">Leaderboard</h2>
+          <div className="bg-zinc-900 rounded-2xl overflow-hidden">
+
+            {/* Day 1 */}
+            <div className="px-4 pt-4 pb-3 border-b border-zinc-800">
+              <p className="text-xs font-semibold text-emerald-400 uppercase tracking-wide mb-2">
+                Day 1 · {day1CourseName}
+              </p>
+              {day1Leaderboard.length > 0 ? (
+                <div className="space-y-1.5">
+                  {day1Leaderboard.map((r, i) => (
+                    <div
+                      key={r.player}
+                      className={`flex items-center gap-3 rounded-xl px-3 py-2.5 ${
+                        i === 0 ? "bg-emerald-900/40 border border-emerald-800/50" : "bg-zinc-800"
+                      }`}
+                    >
+                      <span className={`text-sm font-bold w-4 shrink-0 ${i === 0 ? "text-emerald-400" : "text-zinc-500"}`}>{i + 1}</span>
+                      <span className="flex-1 text-sm font-semibold text-white truncate">{r.player}</span>
+                      <span className="text-xs text-zinc-500 shrink-0">{r.gross}g</span>
+                      <span className="text-sm font-bold text-white shrink-0">{r.net}n</span>
+                      <span
+                        className={`text-xs font-semibold w-8 text-right shrink-0 ${
+                          r.toPar != null && r.toPar < 0 ? "text-red-400" : r.toPar === 0 ? "text-emerald-400" : "text-zinc-400"
+                        }`}
+                      >
+                        {fmtToPar(r.toPar)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-zinc-600 italic">No Day 1 scores yet</p>
+              )}
+            </div>
+
+            {/* Day 2 */}
+            <div className="px-4 pt-4 pb-4">
+              <p className="text-xs font-semibold text-emerald-400 uppercase tracking-wide mb-2">
+                Day 2 · {day2CourseName}
+              </p>
+              {day2Leaderboard.length > 0 ? (
+                <div className="space-y-1.5">
+                  {day2Leaderboard.map((r, i) => (
+                    <div
+                      key={r.player}
+                      className={`flex items-center gap-3 rounded-xl px-3 py-2.5 ${
+                        i === 0 ? "bg-emerald-900/40 border border-emerald-800/50" : "bg-zinc-800"
+                      }`}
+                    >
+                      <span className={`text-sm font-bold w-4 shrink-0 ${i === 0 ? "text-emerald-400" : "text-zinc-500"}`}>{i + 1}</span>
+                      <span className="flex-1 text-sm font-semibold text-white truncate">{r.player}</span>
+                      <span className="text-xs text-zinc-500 shrink-0">{r.gross}g</span>
+                      <span className="text-sm font-bold text-white shrink-0">{r.net}n</span>
+                      <span
+                        className={`text-xs font-semibold w-8 text-right shrink-0 ${
+                          r.toPar != null && r.toPar < 0 ? "text-red-400" : r.toPar === 0 ? "text-emerald-400" : "text-zinc-400"
+                        }`}
+                      >
+                        {fmtToPar(r.toPar)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-zinc-600 italic">No Day 2 scores yet</p>
+              )}
+            </div>
+          </div>
+        </section>
+
+        {/* ── Admin ── */}
+        <div className="px-4 mt-6">
+          <button
+            onClick={() => router.push(`/group/${groupId}/admin`)}
+            className="w-full bg-zinc-800/50 hover:bg-zinc-800 text-zinc-500 hover:text-zinc-300 border border-zinc-700 rounded-2xl py-4 text-sm transition-colors"
+          >
+            Admin Login →
+          </button>
         </div>
 
       </main>
