@@ -359,9 +359,12 @@ export default function ScoringPage() {
     day1: Record<string, { winner: string; note: string }>;
     day2: Record<string, { winner: string; note: string }>;
   }>({ day1: {}, day2: {} });
+  const [ldEdit, setLdEdit] = useState<{ day1: string; day2: string }>({ day1: "", day2: "" });
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ctpSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ctpPropagateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const ldSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const ldPropagateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const title = group?.groupName ?? group?.groupname ?? "Foursome";
 
@@ -493,6 +496,10 @@ export default function ScoringPage() {
           day1: coerceCtpFromDoc(data.contest?.day1),
           day2: coerceCtpFromDoc(data.contest?.day2),
         });
+        setLdEdit({
+          day1: data.contest?.day1?.longestDrive?.winner ?? "",
+          day2: data.contest?.day2?.longestDrive?.winner ?? "",
+        });
         setLoading(false);
       },
       () => { setError("Failed to connect."); setLoading(false); }
@@ -513,6 +520,45 @@ export default function ScoringPage() {
         setSaving(false);
       }
     }, 600);
+  }
+
+  function updateLongestDrive(day: DayKey, value: string) {
+    setLdEdit((prev) => ({ ...prev, [day]: value }));
+    const winner = value.trim() || null;
+
+    if (ldSaveTimerRef.current) clearTimeout(ldSaveTimerRef.current);
+    ldSaveTimerRef.current = setTimeout(async () => {
+      try {
+        await updateDoc(doc(db, "groups", groupId), {
+          [`contest.${day}.longestDrive`]: { hole: null, winner, note: null },
+          updatedAt: serverTimestamp(),
+        });
+      } catch {
+        setError("Could not save Longest Drive.");
+      }
+    }, 600);
+
+    if (winner) {
+      const tournamentId = group?.tournamentId?.trim();
+      if (tournamentId) {
+        if (ldPropagateTimerRef.current) clearTimeout(ldPropagateTimerRef.current);
+        ldPropagateTimerRef.current = setTimeout(async () => {
+          try {
+            const snap = await getDocs(query(collection(db, "groups"), where("tournamentId", "==", tournamentId)));
+            await Promise.all(
+              snap.docs.map((d) =>
+                updateDoc(doc(db, "groups", d.id), {
+                  [`contest.${day}.longestDrive`]: { hole: null, winner, note: null },
+                  updatedAt: serverTimestamp(),
+                })
+              )
+            );
+          } catch {
+            /* silent */
+          }
+        }, 800);
+      }
+    }
   }
 
   function handleScoreChange(player: string, holeIdx: number, value: number | null) {
@@ -611,9 +657,8 @@ export default function ScoringPage() {
     );
   }
 
-  const contestDay = group?.contest?.[selectedDay];
-  const longestDrive = contestDay?.longestDrive;
   const ctpEdits = ctpByDayEdit[selectedDay];
+  const ldWinner = ldEdit[selectedDay];
   const day1CourseName = group?.tournament?.day1Course ?? "Old Greenwood";
   const day2CourseName = group?.tournament?.day2Course ?? "Grays Crossing";
 
@@ -866,16 +911,20 @@ export default function ScoringPage() {
               )}
             </div>
 
-            {/* Longest Drive — admin-set, read-only */}
+            {/* Longest Drive */}
             <div>
               <p className="text-xs font-semibold text-zinc-400 mb-2">💨 Longest Drive</p>
-              {longestDrive?.winner ? (
-                <div className="bg-zinc-800 rounded-xl px-3 py-2">
-                  <span className="text-sm font-semibold text-white">{longestDrive.winner}</span>
-                </div>
-              ) : (
-                <p className="text-xs text-zinc-600 italic">Results posted by admin after the round</p>
-              )}
+              <div className="bg-zinc-800 rounded-xl p-3">
+                <input
+                  value={ldWinner}
+                  onChange={(e) => updateLongestDrive(selectedDay, e.target.value)}
+                  placeholder="Winner name"
+                  className="w-full bg-zinc-700 border border-zinc-600 rounded-lg px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+                {ldWinner && (
+                  <p className="text-xs text-emerald-400 mt-1.5">{ldWinner}</p>
+                )}
+              </div>
             </div>
           </div>
         </section>
