@@ -891,28 +891,37 @@ export default function ScoringPage() {
                 Day 1 · {day1CourseName}
               </p>
               {day1Leaderboard.length > 0 ? (
-                <div className="space-y-1.5">
-                  {day1Leaderboard.map((r, i) => (
-                    <div
-                      key={r.player}
-                      className={`flex items-center gap-3 rounded-xl px-3 py-2.5 ${
-                        i === 0 ? "bg-emerald-900/40 border border-emerald-800/50" : "bg-zinc-800"
-                      }`}
-                    >
-                      <span className={`text-sm font-bold w-4 shrink-0 ${i === 0 ? "text-emerald-400" : "text-zinc-500"}`}>{i + 1}</span>
-                      <span className="flex-1 text-sm font-semibold text-white truncate">{r.player}</span>
-                      <span className="text-xs text-zinc-500 shrink-0">{r.gross}g</span>
-                      <span className="text-sm font-bold text-white shrink-0">{r.net}n</span>
-                      <span
-                        className={`text-xs font-semibold w-8 text-right shrink-0 ${
-                          r.toPar != null && r.toPar < 0 ? "text-red-400" : r.toPar === 0 ? "text-emerald-400" : "text-zinc-400"
+                <>
+                  <div className="flex items-center px-3 mb-1">
+                    <span className="w-5 shrink-0" />
+                    <span className="flex-1" />
+                    <span className="text-[10px] text-zinc-600 w-10 text-right shrink-0">Gross</span>
+                    <span className="text-[10px] text-zinc-600 w-10 text-right shrink-0">Net</span>
+                    <span className="text-[10px] text-zinc-600 w-10 text-right shrink-0">To Par</span>
+                  </div>
+                  <div className="space-y-1.5">
+                    {day1Leaderboard.map((r, i) => (
+                      <div
+                        key={r.player}
+                        className={`flex items-center gap-2 rounded-xl px-3 py-2.5 ${
+                          i === 0 ? "bg-emerald-900/40 border border-emerald-800/50" : "bg-zinc-800"
                         }`}
                       >
-                        {fmtToPar(r.toPar)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+                        <span className={`text-sm font-bold w-5 shrink-0 ${i === 0 ? "text-emerald-400" : "text-zinc-500"}`}>{i + 1}</span>
+                        <span className="flex-1 text-sm font-semibold text-white truncate">{r.player}</span>
+                        <span className="text-sm text-zinc-400 w-10 text-right shrink-0">{r.gross || "—"}</span>
+                        <span className="text-sm font-bold text-white w-10 text-right shrink-0">{r.net || "—"}</span>
+                        <span
+                          className={`text-sm font-semibold w-10 text-right shrink-0 ${
+                            r.toPar != null && r.toPar < 0 ? "text-red-400" : r.toPar === 0 ? "text-emerald-400" : "text-zinc-400"
+                          }`}
+                        >
+                          {fmtToPar(r.toPar)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </>
               ) : (
                 <p className="text-xs text-zinc-600 italic">No Day 1 scores yet</p>
               )}
@@ -924,28 +933,37 @@ export default function ScoringPage() {
                 Day 2 · {day2CourseName}
               </p>
               {day2Leaderboard.length > 0 ? (
-                <div className="space-y-1.5">
-                  {day2Leaderboard.map((r, i) => (
-                    <div
-                      key={r.player}
-                      className={`flex items-center gap-3 rounded-xl px-3 py-2.5 ${
-                        i === 0 ? "bg-emerald-900/40 border border-emerald-800/50" : "bg-zinc-800"
-                      }`}
-                    >
-                      <span className={`text-sm font-bold w-4 shrink-0 ${i === 0 ? "text-emerald-400" : "text-zinc-500"}`}>{i + 1}</span>
-                      <span className="flex-1 text-sm font-semibold text-white truncate">{r.player}</span>
-                      <span className="text-xs text-zinc-500 shrink-0">{r.gross}g</span>
-                      <span className="text-sm font-bold text-white shrink-0">{r.net}n</span>
-                      <span
-                        className={`text-xs font-semibold w-8 text-right shrink-0 ${
-                          r.toPar != null && r.toPar < 0 ? "text-red-400" : r.toPar === 0 ? "text-emerald-400" : "text-zinc-400"
+                <>
+                  <div className="flex items-center px-3 mb-1">
+                    <span className="w-5 shrink-0" />
+                    <span className="flex-1" />
+                    <span className="text-[10px] text-zinc-600 w-10 text-right shrink-0">Gross</span>
+                    <span className="text-[10px] text-zinc-600 w-10 text-right shrink-0">Net</span>
+                    <span className="text-[10px] text-zinc-600 w-10 text-right shrink-0">To Par</span>
+                  </div>
+                  <div className="space-y-1.5">
+                    {day2Leaderboard.map((r, i) => (
+                      <div
+                        key={r.player}
+                        className={`flex items-center gap-2 rounded-xl px-3 py-2.5 ${
+                          i === 0 ? "bg-emerald-900/40 border border-emerald-800/50" : "bg-zinc-800"
                         }`}
                       >
-                        {fmtToPar(r.toPar)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+                        <span className={`text-sm font-bold w-5 shrink-0 ${i === 0 ? "text-emerald-400" : "text-zinc-500"}`}>{i + 1}</span>
+                        <span className="flex-1 text-sm font-semibold text-white truncate">{r.player}</span>
+                        <span className="text-sm text-zinc-400 w-10 text-right shrink-0">{r.gross || "—"}</span>
+                        <span className="text-sm font-bold text-white w-10 text-right shrink-0">{r.net || "—"}</span>
+                        <span
+                          className={`text-sm font-semibold w-10 text-right shrink-0 ${
+                            r.toPar != null && r.toPar < 0 ? "text-red-400" : r.toPar === 0 ? "text-emerald-400" : "text-zinc-400"
+                          }`}
+                        >
+                          {fmtToPar(r.toPar)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </>
               ) : (
                 <p className="text-xs text-zinc-600 italic">No Day 2 scores yet</p>
               )}
