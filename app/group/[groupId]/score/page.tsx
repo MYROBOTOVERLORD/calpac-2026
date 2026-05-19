@@ -376,6 +376,12 @@ export default function ScoringPage() {
             >
               ← Scorecard
             </button>
+            <button
+              onClick={() => router.push("/leaderboard")}
+              className="flex items-center gap-1.5 bg-black/50 backdrop-blur-sm rounded-full px-3 py-1.5 text-xs text-zinc-300 hover:text-white transition-colors"
+            >
+              🏆 Leaderboard
+            </button>
             <div className="bg-black/50 backdrop-blur-sm rounded-full px-3 py-1.5 text-xs text-zinc-300">
               {course.shortName} · {saving ? "Saving…" : "Saved"}
             </div>
