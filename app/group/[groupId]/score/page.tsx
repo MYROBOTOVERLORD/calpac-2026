@@ -3,10 +3,14 @@
 import { useEffect, useRef, useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
+  collection,
   doc,
+  getDocs,
   onSnapshot,
+  query,
   serverTimestamp,
   updateDoc,
+  where,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { getCourseForDay, type HoleData, type CourseData } from "@/lib/courses";
@@ -22,6 +26,7 @@ type LeaderRow = { player: string; gross: number; net: number; toPar: number | n
 type GroupDoc = {
   groupName?: string;
   groupname?: string;
+  tournamentId?: string;
   playerNames?: string[];
   playerNamesByDay?: { day1?: string[]; day2?: string[] };
   scores?:
@@ -152,6 +157,45 @@ function getScoreColor(score: number | null, par: number): string {
 function fmtToPar(v: number | null): string {
   if (v == null) return "—";
   return v === 0 ? "E" : v < 0 ? String(v) : `+${v}`;
+}
+
+function parseFeetInches(raw: string) {
+  const s = (raw ?? "").trim();
+  if (!s) return { feet: "", inches: "" };
+  const apo = s.match(/(\d+)\s*'\s*(\d+)?/);
+  if (apo) return { feet: apo[1] ?? "", inches: apo[2] ?? "" };
+  const nums = s.match(/\d+/g) ?? [];
+  if (nums.length >= 2) return { feet: nums[0] ?? "", inches: nums[1] ?? "" };
+  if (nums.length === 1) return { feet: nums[0] ?? "", inches: "" };
+  return { feet: "", inches: "" };
+}
+
+function formatFeetInches(feet: string, inches: string) {
+  const f = feet.trim(), i = inches.trim();
+  if (!f && !i) return "";
+  const fn = Math.max(0, parseInt(f, 10) || 0);
+  const inc = Math.max(0, parseInt(i, 10) || 0);
+  const total = fn * 12 + inc;
+  return `${Math.floor(total / 12)}' ${total % 12}"`;
+}
+
+function coerceCtpFromDoc(input?: {
+  closestToPinByHole?: Record<string, ContestWinnerNote>;
+  closestToPin?: ContestEntry;
+}) {
+  const out: Record<string, { winner: string; note: string }> = {};
+  const map = input?.closestToPinByHole;
+  if (map && typeof map === "object") {
+    for (const [hole, v] of Object.entries(map)) {
+      out[String(hole)] = { winner: v?.winner ?? "", note: v?.note ?? "" };
+    }
+    return out;
+  }
+  const legacy = input?.closestToPin;
+  if (legacy?.hole != null) {
+    out[String(legacy.hole)] = { winner: legacy.winner ?? "", note: legacy.note ?? "" };
+  }
+  return out;
 }
 
 // ─── Green Popup ─────────────────────────────────────────────────────────────
@@ -311,7 +355,13 @@ export default function ScoringPage() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [showGreen, setShowGreen] = useState(false);
+  const [ctpByDayEdit, setCtpByDayEdit] = useState<{
+    day1: Record<string, { winner: string; note: string }>;
+    day2: Record<string, { winner: string; note: string }>;
+  }>({ day1: {}, day2: {} });
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const ctpSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const ctpPropagateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const title = group?.groupName ?? group?.groupname ?? "Foursome";
 
@@ -439,6 +489,10 @@ export default function ScoringPage() {
         });
         setCharityStrokes(coerceNumberMap(all, data.charityStrokes ?? null, 0));
         setTreeStrokes(coerceNumberMap(all, data.treeStrokes ?? null, 0));
+        setCtpByDayEdit({
+          day1: coerceCtpFromDoc(data.contest?.day1),
+          day2: coerceCtpFromDoc(data.contest?.day2),
+        });
         setLoading(false);
       },
       () => { setError("Failed to connect."); setLoading(false); }
@@ -470,6 +524,56 @@ export default function ScoringPage() {
     const next = { ...scoresByDay, [selectedDay]: nextDayScores };
     setScoresByDay(next);
     scheduleSave(next);
+  }
+
+  function updateCtpForHole(day: DayKey, holeNumber: number, field: "winner" | "note", value: string) {
+    const holeKey = String(holeNumber);
+    setCtpByDayEdit((prev) => {
+      const existing = prev[day][holeKey] ?? { winner: "", note: "" };
+      const next = {
+        ...prev,
+        [day]: { ...prev[day], [holeKey]: { ...existing, [field]: value } },
+      };
+      const entry = next[day][holeKey];
+      const winner = entry.winner.trim() || null;
+      const note = entry.note.trim() || null;
+
+      if (ctpSaveTimerRef.current) clearTimeout(ctpSaveTimerRef.current);
+      ctpSaveTimerRef.current = setTimeout(async () => {
+        try {
+          await updateDoc(doc(db, "groups", groupId), {
+            [`contest.${day}.closestToPinByHole.${holeKey}`]: { winner, note },
+            updatedAt: serverTimestamp(),
+          });
+        } catch {
+          setError("Could not save CTP result.");
+        }
+      }, 600);
+
+      if (field === "note" && note != null) {
+        const tournamentId = group?.tournamentId?.trim();
+        if (tournamentId) {
+          if (ctpPropagateTimerRef.current) clearTimeout(ctpPropagateTimerRef.current);
+          ctpPropagateTimerRef.current = setTimeout(async () => {
+            try {
+              const snap = await getDocs(query(collection(db, "groups"), where("tournamentId", "==", tournamentId)));
+              await Promise.all(
+                snap.docs.map((d) =>
+                  updateDoc(doc(db, "groups", d.id), {
+                    [`contest.${day}.closestToPinByHole.${holeKey}`]: { winner, note },
+                    updatedAt: serverTimestamp(),
+                  })
+                )
+              );
+            } catch {
+              /* silent — propagation is best-effort */
+            }
+          }, 800);
+        }
+      }
+
+      return next;
+    });
   }
 
   if (loading) {
@@ -508,10 +612,8 @@ export default function ScoringPage() {
   }
 
   const contestDay = group?.contest?.[selectedDay];
-  const ctpByHole = contestDay?.closestToPinByHole ?? {};
-  const ctpEntries = par3Holes.map((h) => ({ hole: h, entry: ctpByHole[String(h)] })).filter((x) => x.entry?.winner || x.entry?.note);
-  const legacyCtp = contestDay?.closestToPin;
   const longestDrive = contestDay?.longestDrive;
+  const ctpEdits = ctpByDayEdit[selectedDay];
   const day1CourseName = group?.tournament?.day1Course ?? "Old Greenwood";
   const day2CourseName = group?.tournament?.day2Course ?? "Grays Crossing";
 
@@ -715,32 +817,56 @@ export default function ScoringPage() {
           <h2 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-3">
             Contests · {selectedDay === "day1" ? "Day 1" : "Day 2"}
           </h2>
-          <div className="bg-zinc-900 rounded-2xl p-4 space-y-4">
+          <div className="bg-zinc-900 rounded-2xl p-4 space-y-5">
+
+            {/* CTP */}
             <div>
-              <p className="text-xs font-semibold text-zinc-400 mb-2">
-                ⛳ Closest to the Pin{par3Holes.length ? ` · Par 3s: Holes ${par3Holes.join(", ")}` : ""}
+              <p className="text-xs font-semibold text-zinc-400 mb-3">
+                ⛳ Closest to the Pin{par3Holes.length ? ` · Par 3s: ${par3Holes.map((h) => `Hole ${h}`).join(", ")}` : ""}
               </p>
-              {ctpEntries.length > 0 ? (
-                <div className="space-y-1.5">
-                  {ctpEntries.map(({ hole: h, entry }) => (
-                    <div key={h} className="flex items-center justify-between bg-zinc-800 rounded-xl px-3 py-2">
-                      <span className="text-xs text-zinc-400">Hole {h}</span>
-                      <span className="text-sm font-semibold text-white">{entry?.winner}</span>
-                      {entry?.note && <span className="text-xs text-emerald-400">{entry.note}</span>}
-                    </div>
-                  ))}
-                </div>
-              ) : legacyCtp?.winner ? (
-                <div className="flex items-center gap-3 bg-zinc-800 rounded-xl px-3 py-2">
-                  {legacyCtp.hole != null && <span className="text-xs text-zinc-400">Hole {legacyCtp.hole}</span>}
-                  <span className="text-sm font-semibold text-white flex-1">{legacyCtp.winner}</span>
-                  {legacyCtp.note && <span className="text-xs text-emerald-400">{legacyCtp.note}</span>}
+              {par3Holes.length > 0 ? (
+                <div className="space-y-3">
+                  {par3Holes.map((h) => {
+                    const entry = ctpEdits[String(h)] ?? { winner: "", note: "" };
+                    const dist = parseFeetInches(entry.note);
+                    return (
+                      <div key={h} className="bg-zinc-800 rounded-xl p-3">
+                        <p className="text-xs text-zinc-500 font-semibold mb-2">Hole {h} · Par 3</p>
+                        <div className="flex gap-2">
+                          <input
+                            value={entry.winner}
+                            onChange={(e) => updateCtpForHole(selectedDay, h, "winner", e.target.value)}
+                            placeholder="Winner name"
+                            className="flex-1 bg-zinc-700 border border-zinc-600 rounded-lg px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                          />
+                          <input
+                            value={dist.feet}
+                            onChange={(e) => updateCtpForHole(selectedDay, h, "note", formatFeetInches(e.target.value, dist.inches))}
+                            inputMode="numeric"
+                            placeholder="Ft"
+                            className="w-14 bg-zinc-700 border border-zinc-600 rounded-lg px-2 py-2 text-sm text-white text-center placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                          />
+                          <input
+                            value={dist.inches}
+                            onChange={(e) => updateCtpForHole(selectedDay, h, "note", formatFeetInches(dist.feet, e.target.value))}
+                            inputMode="numeric"
+                            placeholder="In"
+                            className="w-14 bg-zinc-700 border border-zinc-600 rounded-lg px-2 py-2 text-sm text-white text-center placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                          />
+                        </div>
+                        {entry.winner && entry.note && (
+                          <p className="text-xs text-emerald-400 mt-1.5">{entry.winner} · {entry.note}</p>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
-                <p className="text-xs text-zinc-600 italic">Results posted by admin after the round</p>
+                <p className="text-xs text-zinc-600 italic">Set course pars in Admin to enable CTP tracking per hole.</p>
               )}
             </div>
 
+            {/* Longest Drive — admin-set, read-only */}
             <div>
               <p className="text-xs font-semibold text-zinc-400 mb-2">💨 Longest Drive</p>
               {longestDrive?.winner ? (
