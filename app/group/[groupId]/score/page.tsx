@@ -668,6 +668,22 @@ export default function ScoringPage() {
 
       <main className="min-h-screen bg-zinc-950 text-white max-w-lg mx-auto pb-8">
 
+        {/* ── Top Bar ── */}
+        <div className="flex items-center justify-between px-4 pt-4 pb-1">
+          <button
+            onClick={() => router.push("/")}
+            className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors py-1"
+          >
+            ← Change Group
+          </button>
+          <button
+            onClick={() => router.push("/leaderboard")}
+            className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors py-1"
+          >
+            🏆 Leaderboard
+          </button>
+        </div>
+
         {/* ── Day Selector ── */}
         <div className="flex gap-2 px-4 pt-4 pb-2">
           {(["day1", "day2"] as DayKey[]).map((d) => (
