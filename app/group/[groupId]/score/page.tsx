@@ -355,6 +355,10 @@ export default function ScoringPage() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [showGreen, setShowGreen] = useState(false);
+  // Player session (set by home page via sessionStorage)
+  const [currentPlayer, setCurrentPlayer] = useState<string | null>(null);
+  const [playerDay1GroupId, setPlayerDay1GroupId] = useState<string | null>(null);
+  const [playerDay2GroupId, setPlayerDay2GroupId] = useState<string | null>(null);
   const [ctpByDayEdit, setCtpByDayEdit] = useState<{
     day1: Record<string, { winner: string; note: string }>;
     day2: Record<string, { winner: string; note: string }>;
@@ -365,6 +369,24 @@ export default function ScoringPage() {
   const ctpPropagateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ldSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ldPropagateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Read player session + intended day from sessionStorage
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem("calpac_player");
+      if (raw) {
+        const data = JSON.parse(raw);
+        setCurrentPlayer(data.name ?? null);
+        setPlayerDay1GroupId(data.day1GroupId ?? null);
+        setPlayerDay2GroupId(data.day2GroupId ?? null);
+      }
+      const intendedDay = sessionStorage.getItem("calpac_intended_day");
+      if (intendedDay === "day1" || intendedDay === "day2") {
+        setSelectedDay(intendedDay);
+        sessionStorage.removeItem("calpac_intended_day");
+      }
+    } catch { /* ignore */ }
+  }, []);
 
   const title = group?.groupName ?? group?.groupname ?? "Foursome";
 
@@ -674,8 +696,11 @@ export default function ScoringPage() {
             onClick={() => router.push("/")}
             className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors py-1"
           >
-            ← Change Group
+            ← {currentPlayer ? "Change Player" : "Groups"}
           </button>
+          {currentPlayer && (
+            <span className="text-xs text-emerald-400 font-semibold">{currentPlayer}</span>
+          )}
           <button
             onClick={() => router.push("/leaderboard")}
             className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors py-1"
@@ -689,7 +714,17 @@ export default function ScoringPage() {
           {(["day1", "day2"] as DayKey[]).map((d) => (
             <button
               key={d}
-              onClick={() => setSelectedDay(d)}
+              onClick={() => {
+                if (d === selectedDay) return;
+                // If player's groups differ between days, navigate to the correct group
+                const targetGroupId = d === "day1" ? playerDay1GroupId : playerDay2GroupId;
+                if (targetGroupId && targetGroupId !== groupId) {
+                  sessionStorage.setItem("calpac_intended_day", d);
+                  router.push(`/group/${targetGroupId}/score`);
+                } else {
+                  setSelectedDay(d);
+                }
+              }}
               className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-colors ${
                 selectedDay === d ? "bg-emerald-600 text-white" : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"
               }`}
