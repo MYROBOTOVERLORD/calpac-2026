@@ -35,8 +35,9 @@ type PlayerRow = {
   player: string;
   group: string;
   gross: number;
+  grossToPar: number | null;
   net: number;
-  toPar: number | null;
+  netToPar: number | null;
   holesPlayed: number;
 };
 
@@ -94,6 +95,13 @@ function getScoresForDay(data: GroupDoc, day: DayKey): Record<string, Array<numb
   return (raw[day] as Record<string, Array<number | null>>) ?? {};
 }
 
+function grossToParSoFar(scores: Array<number | null>, pars: number[] | null): number | null {
+  if (!pars || pars.length !== HOLE_COUNT) return null;
+  let g = 0, p = 0, n = 0;
+  scores.forEach((v, i) => { if (typeof v === "number") { g += v; p += pars[i] ?? 0; n++; } });
+  return n === 0 ? null : g - p;
+}
+
 function computeLeaderboard(groups: GroupDoc[], day: DayKey): PlayerRow[] {
   const rows: PlayerRow[] = [];
   for (const g of groups) {
@@ -116,17 +124,36 @@ function computeLeaderboard(groups: GroupDoc[], day: DayKey): PlayerRow[] {
       const charity = ((g.charityStrokes?.[p] ?? 0) as number) + ((g.treeStrokes?.[p] ?? 0) as number);
       const net = applyCharity(netRunning(s, hcpsValid, hcp + adj + teeBonus), s, charity);
       const holesPlayed = s.filter((v) => typeof v === "number").length;
-      rows.push({ player: p, group: groupName, gross: arrSum(s), net, toPar: toParSoFar(s, parsValid), holesPlayed });
+      rows.push({
+        player: p,
+        group: groupName,
+        gross: arrSum(s),
+        grossToPar: grossToParSoFar(s, parsValid),
+        net,
+        netToPar: toParSoFar(s, parsValid),
+        holesPlayed,
+      });
     }
   }
-  rows.sort((a, b) => {
+  return rows;
+}
+
+function sortedGross(rows: PlayerRow[]): PlayerRow[] {
+  return [...rows].sort((a, b) => {
     if (a.holesPlayed === 0 && b.holesPlayed > 0) return 1;
     if (b.holesPlayed === 0 && a.holesPlayed > 0) return -1;
-    // Sort by toPar first (null = no pars configured, fall back to net)
-    if (a.toPar !== null && b.toPar !== null) return a.toPar - b.toPar || a.net - b.net || a.gross - b.gross;
+    if (a.grossToPar !== null && b.grossToPar !== null) return a.grossToPar - b.grossToPar || a.gross - b.gross;
+    return a.gross - b.gross;
+  });
+}
+
+function sortedNet(rows: PlayerRow[]): PlayerRow[] {
+  return [...rows].sort((a, b) => {
+    if (a.holesPlayed === 0 && b.holesPlayed > 0) return 1;
+    if (b.holesPlayed === 0 && a.holesPlayed > 0) return -1;
+    if (a.netToPar !== null && b.netToPar !== null) return a.netToPar - b.netToPar || a.net - b.net || a.gross - b.gross;
     return a.net - b.net || a.gross - b.gross;
   });
-  return rows;
 }
 
 // ─── Page ────────────────────────────────────────────────────────────────────
@@ -136,6 +163,7 @@ export default function LeaderboardPage() {
   const [groups, setGroups] = useState<GroupDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDay, setSelectedDay] = useState<DayKey>("day1");
+  const [boardType, setBoardType] = useState<"net" | "gross">("net");
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   useEffect(() => {
@@ -151,7 +179,8 @@ export default function LeaderboardPage() {
     return () => unsub();
   }, []);
 
-  const leaderboard = useMemo(() => computeLeaderboard(groups, selectedDay), [groups, selectedDay]);
+  const allRows = useMemo(() => computeLeaderboard(groups, selectedDay), [groups, selectedDay]);
+  const leaderboard = useMemo(() => boardType === "gross" ? sortedGross(allRows) : sortedNet(allRows), [allRows, boardType]);
 
   const courseName = useMemo(() => {
     const names = new Set(
@@ -196,7 +225,7 @@ export default function LeaderboardPage() {
         </div>
 
         {/* Day selector */}
-        <div className="flex gap-2 mb-4">
+        <div className="flex gap-2 mb-3">
           {(["day1", "day2"] as DayKey[]).map((d) => (
             <button
               key={d}
@@ -210,16 +239,31 @@ export default function LeaderboardPage() {
           ))}
         </div>
 
+        {/* Board type selector */}
+        <div className="flex gap-2 mb-4">
+          {(["net", "gross"] as const).map((b) => (
+            <button
+              key={b}
+              onClick={() => setBoardType(b)}
+              className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-colors ${
+                boardType === b ? "bg-zinc-200 text-zinc-900" : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"
+              }`}
+            >
+              {b === "net" ? "Net" : "Gross"}
+            </button>
+          ))}
+        </div>
+
         <p className="text-xs text-zinc-500 uppercase tracking-wide font-semibold mb-3">
-          {courseName} · Net score
+          {courseName} · {boardType === "net" ? "Net" : "Gross"} leaderboard
         </p>
 
         {/* Column headers */}
         <div className="flex items-center px-3 mb-1 gap-2">
           <span className="w-6 shrink-0" />
           <span className="flex-1" />
-          <span className="text-[10px] text-zinc-600 w-10 text-right shrink-0">Gross</span>
-          <span className="text-[10px] text-zinc-600 w-10 text-right shrink-0">Net</span>
+          <span className="text-[10px] text-zinc-600 w-8 text-right shrink-0">Thru</span>
+          <span className="text-[10px] text-zinc-600 w-10 text-right shrink-0">{boardType === "net" ? "Net" : "Gross"}</span>
           <span className="text-[10px] text-zinc-600 w-10 text-right shrink-0">To Par</span>
         </div>
 
@@ -227,6 +271,10 @@ export default function LeaderboardPage() {
         <div className="space-y-1.5">
           {leaderboard.map((r, i) => {
             const active = r.holesPlayed > 0;
+            const finished = r.holesPlayed === HOLE_COUNT;
+            const thru = finished ? "F" : active ? String(r.holesPlayed) : "—";
+            const score = boardType === "net" ? r.net : r.gross;
+            const toPar = boardType === "net" ? r.netToPar : r.grossToPar;
             return (
               <div
                 key={`${r.player}-${r.group}`}
@@ -243,22 +291,22 @@ export default function LeaderboardPage() {
                   <p className="text-sm font-semibold text-white truncate">{r.player}</p>
                   <p className="text-[11px] text-zinc-500 truncate">{r.group}</p>
                 </div>
-                <span className="text-sm text-zinc-400 w-10 text-right shrink-0">
-                  {active ? r.gross : "—"}
+                <span className={`text-xs w-8 text-right shrink-0 font-semibold ${finished ? "text-emerald-400" : "text-zinc-500"}`}>
+                  {thru}
                 </span>
                 <span className="text-sm font-bold text-white w-10 text-right shrink-0">
-                  {active ? r.net : "—"}
+                  {active ? score : "—"}
                 </span>
                 <span
                   className={`text-sm font-semibold w-10 text-right shrink-0 ${
-                    active && r.toPar != null && r.toPar < 0
+                    active && toPar != null && toPar < 0
                       ? "text-red-400"
-                      : active && r.toPar === 0
+                      : active && toPar === 0
                       ? "text-emerald-400"
                       : "text-zinc-500"
                   }`}
                 >
-                  {active ? fmtToPar(r.toPar) : "—"}
+                  {active ? fmtToPar(toPar) : "—"}
                 </span>
               </div>
             );
@@ -268,7 +316,7 @@ export default function LeaderboardPage() {
           )}
         </div>
 
-        <p className="text-xs text-zinc-700 text-center mt-6">Updates automatically · net score low wins</p>
+        <p className="text-xs text-zinc-700 text-center mt-6">Updates automatically · low score wins</p>
       </div>
     </main>
   );
