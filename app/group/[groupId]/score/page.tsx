@@ -233,9 +233,9 @@ function GreenPopup({ hole, course, onClose }: {
 
         <div className="relative w-full aspect-[4/3] bg-zinc-800">
           <img
-            src={hole.imageUrl}
-            alt={`Hole ${hole.hole} aerial`}
-            className="w-full h-full object-cover"
+            src={hole.greenImageUrl ?? hole.imageUrl}
+            alt={`Hole ${hole.hole} green map`}
+            className="w-full h-full object-contain"
           />
         </div>
 
