@@ -1135,7 +1135,7 @@ export default function GroupAdminPage() {
 														>
 																			<option value="combo">2 Trees</option>
 															<option value="three">3 Trees (+1)</option>
-															<option value="four">4 Trees (+2)</option>
+															<option value="four">4 Trees</option>
 														</select>
 													</td>
 													<td className="p-2">
