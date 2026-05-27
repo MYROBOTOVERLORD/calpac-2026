@@ -224,6 +224,11 @@ export default function GroupAdminPage() {
 	const [addingPlayer, setAddingPlayer] = useState(false);
 	const [addPlayerError, setAddPlayerError] = useState<string | null>(null);
 
+	const [newFoursomeNumber, setNewFoursomeNumber] = useState("");
+	const [creatingFoursome, setCreatingFoursome] = useState(false);
+	const [createFoursomeError, setCreateFoursomeError] = useState<string | null>(null);
+	const [createdFoursomeId, setCreatedFoursomeId] = useState<string | null>(null);
+
 	useEffect(() => {
 		const unsub = onAuthStateChanged(auth, (u) => setAdminUser(u));
 		return () => unsub();
@@ -766,6 +771,48 @@ export default function GroupAdminPage() {
 		}
 	}
 
+	async function createFoursome() {
+		if (!isAdmin) { setCreateFoursomeError("Admin access required."); return; }
+		setCreateFoursomeError(null);
+		setCreatedFoursomeId(null);
+		const n = Math.floor(Number(newFoursomeNumber.trim() || 0));
+		if (!Number.isFinite(n) || n <= 0) {
+			setCreateFoursomeError("Enter a valid foursome number (e.g. 4).");
+			return;
+		}
+		const alreadyExists = foursomeOptions.some((o) => o.n === n);
+		if (alreadyExists) {
+			setCreateFoursomeError(`Foursome ${n} already exists.`);
+			return;
+		}
+		setCreatingFoursome(true);
+		try {
+			const tournament = group?.tournament ?? {};
+			const ref = await addDoc(collection(db, "groups"), {
+				groupName: `Foursome ${n}`,
+				playerNames: [],
+				playerNamesByDay: { day1: [], day2: [] },
+				day1ScoresLocked: false,
+				scores: { day1: {}, day2: {} },
+				handicaps: {},
+				day2HandicapAdjustments: {},
+				teeChoices: { day1: {}, day2: {} },
+				charityStrokes: {},
+				treeStrokes: {},
+				tournament: { ...tournament },
+				createdAt: serverTimestamp(),
+				updatedAt: serverTimestamp(),
+			});
+			setCreatedFoursomeId(ref.id);
+			setNewFoursomeNumber("");
+		} catch (err) {
+			const message = err instanceof Error ? err.message : String(err);
+			setCreateFoursomeError(`Could not create foursome: ${message}`);
+		} finally {
+			setCreatingFoursome(false);
+		}
+	}
+
 	async function saveScorecards() {
 		if (!isAdmin) {
 			setError("Admin access required.");
@@ -1188,6 +1235,28 @@ export default function GroupAdminPage() {
 							</div>
 						</div>
 
+						<div className="mt-6 bg-white/80 border border-sky-200 rounded-2xl p-5">
+							<h2 className="text-lg font-semibold">Create new foursome</h2>
+							<p className="text-slate-600 text-sm mt-1">Creates an empty foursome. Add players to it via the All Players table above.</p>
+							<div className="mt-3 flex flex-wrap gap-2 items-center">
+								<input
+									value={newFoursomeNumber}
+									onChange={(e) => setNewFoursomeNumber(e.target.value)}
+									inputMode="numeric"
+									className="p-2 bg-white border border-sky-200 rounded-lg w-32 focus:outline-none focus:ring-2 focus:ring-sky-200"
+									placeholder="Foursome #"
+								/>
+								<button
+									onClick={createFoursome}
+									disabled={creatingFoursome}
+									className="bg-sky-600 hover:bg-sky-500 disabled:opacity-60 px-4 py-2 rounded-lg font-semibold text-white"
+								>
+									{creatingFoursome ? "Creating…" : "Create foursome"}
+								</button>
+								{createFoursomeError ? <p className="text-sm text-red-600">{createFoursomeError}</p> : null}
+								{createdFoursomeId ? <p className="text-sm text-emerald-700">Created! It now appears in the group dropdowns.</p> : null}
+							</div>
+						</div>
 
 							<div className="mt-6 bg-white/80 border border-sky-200 rounded-2xl p-5">
 							<h2 className="text-lg font-semibold">Course scorecards (Pars)</h2>
