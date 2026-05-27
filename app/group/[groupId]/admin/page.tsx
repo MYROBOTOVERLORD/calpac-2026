@@ -56,7 +56,8 @@ type GroupDoc = {
 type GroupWithId = { id: string; data: GroupDoc };
 
 type PlayerEditDraft = {
-	moveToGid?: string;
+	moveToGidDay1?: string;
+	moveToGidDay2?: string;
 	name?: string;
 	handicap?: string;
 	day2Adj?: string;
@@ -112,13 +113,6 @@ function coerceTeeMap(players: string[], input?: Record<string, TeeKey | null> |
 		next[p] = v === "three" || v === "four" || v === "combo" || v === "stampede" || v === "tips" ? v : defaultValue;
 	}
 	return next;
-}
-
-function parsePlayersDraft(raw: string) {
-	return raw
-		.split(/,|\n/)
-		.map((s) => s.trim())
-		.filter(Boolean);
 }
 
 function uniqPreserveOrder(values: string[]) {
@@ -206,13 +200,6 @@ export default function GroupAdminPage() {
 		return d2.filter(Boolean);
 	}, [group?.playerNames, group?.playerNamesByDay?.day2]);
 	const players = useMemo(() => (selectedDay === "day1" ? playersDay1 : playersDay2), [playersDay1, playersDay2, selectedDay]);
-	const [newFoursomeNumberDraft, setNewFoursomeNumberDraft] = useState("");
-	const [newPinDraft, setNewPinDraft] = useState("");
-	const [newPlayersDraft, setNewPlayersDraft] = useState("");
-	const [createGroupError, setCreateGroupError] = useState<string | null>(null);
-	const [creatingGroup, setCreatingGroup] = useState(false);
-	const [createdGroupId, setCreatedGroupId] = useState<string | null>(null);
-
 	const [day1ParsDraft, setDay1ParsDraft] = useState("");
 	const [day2ParsDraft, setDay2ParsDraft] = useState("");
 	const [day1HcpsDraft, setDay1HcpsDraft] = useState("");
@@ -229,18 +216,11 @@ export default function GroupAdminPage() {
 	const [allGroupsLoading, setAllGroupsLoading] = useState(false);
 	const [allGroupsError, setAllGroupsError] = useState<string | null>(null);
 	const [allGroups, setAllGroups] = useState<GroupWithId[]>([]);
-	const [rosterDay, setRosterDay] = useState<DayKey>("day1");
 	const [playerEdits, setPlayerEdits] = useState<Record<string, PlayerEditDraft>>({});
 	const [savingPlayerKey, setSavingPlayerKey] = useState<string | null>(null);
 
 	const [addPlayerName, setAddPlayerName] = useState("");
-	const [addPlayerFoursome, setAddPlayerFoursome] = useState("");
 	const [addPlayerHandicap, setAddPlayerHandicap] = useState("0");
-	const [addPlayerDay2Adj, setAddPlayerDay2Adj] = useState("0");
-	const [addPlayerTeeDay1, setAddPlayerTeeDay1] = useState<TeeKey>("combo");
-	const [addPlayerTeeDay2, setAddPlayerTeeDay2] = useState<TeeKey>("stampede");
-	const [addPlayerCharity, setAddPlayerCharity] = useState("0");
-	const [addPlayerTree, setAddPlayerTree] = useState("0");
 	const [addingPlayer, setAddingPlayer] = useState(false);
 	const [addPlayerError, setAddPlayerError] = useState<string | null>(null);
 
@@ -348,8 +328,8 @@ export default function GroupAdminPage() {
 		}, 250);
 	}
 
-	function editKey(gid: string, player: string) {
-		return `${gid}::${player}`;
+	function editKey(player: string) {
+		return player.trim().toLowerCase();
 	}
 
 	function getGroupTitle(data: GroupDoc, fallbackId: string) {
@@ -380,92 +360,124 @@ export default function GroupAdminPage() {
 		return map;
 	}, [foursomeOptions]);
 
+	const allPlayersRoster = useMemo(() => {
+		const seen = new Map<string, { player: string; day1Gid: string | null; day2Gid: string | null; primaryGroup: GroupWithId }>();
+		for (const g of allGroups) {
+			const legacy = (g.data.playerNames ?? []).filter(Boolean);
+			const gDay1 = ((g.data.playerNamesByDay?.day1 ?? legacy) as string[]).filter(Boolean);
+			const gDay2 = ((g.data.playerNamesByDay?.day2 ?? legacy) as string[]).filter(Boolean);
+			for (const p of gDay1) {
+				const lowKey = p.trim().toLowerCase();
+				if (!seen.has(lowKey)) {
+					seen.set(lowKey, { player: p, day1Gid: g.id, day2Gid: null, primaryGroup: g });
+				} else {
+					const existing = seen.get(lowKey)!;
+					if (!existing.day1Gid) { existing.day1Gid = g.id; existing.primaryGroup = g; }
+				}
+			}
+			for (const p of gDay2) {
+				const lowKey = p.trim().toLowerCase();
+				if (!seen.has(lowKey)) {
+					seen.set(lowKey, { player: p, day1Gid: null, day2Gid: g.id, primaryGroup: g });
+				} else {
+					const existing = seen.get(lowKey)!;
+					if (!existing.day2Gid) existing.day2Gid = g.id;
+				}
+			}
+		}
+		return Array.from(seen.values());
+	}, [allGroups]);
+
 	function findPlayerKey(players: string[], player: string) {
 		const lowered = player.trim().toLowerCase();
 		return players.find((p) => p.trim().toLowerCase() === lowered) ?? null;
 	}
 
-		async function deletePlayerFromGroup(opts: { gid: string; player: string }) {
+	async function deletePlayerGlobally(player: string, currentDay1Gid: string | null, currentDay2Gid: string | null) {
 			if (!isAdmin) {
 				setError("Admin access required.");
 				return;
 			}
-			const { gid, player } = opts;
-			const groupRow = allGroups.find((g) => g.id === gid);
-			if (!groupRow) return;
-			const title = getGroupTitle(groupRow.data, gid);
-			const ok = window.confirm(`Delete ${player} from ${title}? This will remove their scores and settings from this foursome.`);
+			const ok = window.confirm(`Delete ${player} from all foursomes? This will remove their scores and settings.`);
 			if (!ok) return;
 
+			const gidsWithPlayer = new Set<string>();
+			for (const g of allGroups) {
+				const legacy = (g.data.playerNames ?? []).filter(Boolean);
+				const d1 = ((g.data.playerNamesByDay?.day1 ?? legacy) as string[]).filter(Boolean);
+				const d2 = ((g.data.playerNamesByDay?.day2 ?? legacy) as string[]).filter(Boolean);
+				if ([...d1, ...d2].some((p) => p.toLowerCase() === player.toLowerCase())) {
+					gidsWithPlayer.add(g.id);
+				}
+			}
+
 			setError(null);
-			try {
-				const current = groupRow.data;
-				const legacy = (current.playerNames ?? []).filter(Boolean);
-				const curDay1 = ((current.playerNamesByDay?.day1 ?? legacy) as string[]).filter(Boolean);
-				const curDay2 = ((current.playerNamesByDay?.day2 ?? legacy) as string[]).filter(Boolean);
-				const curPlayers = uniqPreserveOrder([...curDay1, ...curDay2]);
-				const curKey = findPlayerKey(curPlayers, player);
-				if (!curKey) return;
-				const lowered = curKey.toLowerCase();
-				const nextDay1 = curDay1.filter((p) => p.toLowerCase() !== lowered);
-				const nextDay2 = curDay2.filter((p) => p.toLowerCase() !== lowered);
-				const nextPlayers = uniqPreserveOrder([...nextDay1, ...nextDay2]);
+			for (const gid of gidsWithPlayer) {
+				try {
+					const groupRow = allGroups.find((g) => g.id === gid);
+					if (!groupRow) continue;
+					const current = groupRow.data;
+					const legacy = (current.playerNames ?? []).filter(Boolean);
+					const curDay1 = ((current.playerNamesByDay?.day1 ?? legacy) as string[]).filter(Boolean);
+					const curDay2 = ((current.playerNamesByDay?.day2 ?? legacy) as string[]).filter(Boolean);
+					const curPlayers = uniqPreserveOrder([...curDay1, ...curDay2]);
+					const curKey = findPlayerKey(curPlayers, player);
+					if (!curKey) continue;
+					const lowered = curKey.toLowerCase();
+					const nextDay1 = curDay1.filter((p) => p.toLowerCase() !== lowered);
+					const nextDay2 = curDay2.filter((p) => p.toLowerCase() !== lowered);
+					const nextPlayers = uniqPreserveOrder([...nextDay1, ...nextDay2]);
 
-				const nextHandicaps = { ...(current.handicaps ?? {}) } as Record<string, number | null>;
-				delete nextHandicaps[curKey];
-				const nextDay2Adj = { ...(current.day2HandicapAdjustments ?? {}) } as Record<string, number | null>;
-				delete nextDay2Adj[curKey];
-				const nextCharity = { ...(current.charityStrokes ?? {}) } as Record<string, number | null>;
-				delete nextCharity[curKey];
-				const nextTree = { ...(current.treeStrokes ?? {}) } as Record<string, number | null>;
-				delete nextTree[curKey];
-				const nextTeeChoices = {
-					day1: { ...(current.teeChoices?.day1 ?? {}) } as Record<string, TeeKey | null>,
-					day2: { ...(current.teeChoices?.day2 ?? {}) } as Record<string, TeeKey | null>,
-				};
-				delete nextTeeChoices.day1[curKey];
-				delete nextTeeChoices.day2[curKey];
+					const nextHandicaps = { ...(current.handicaps ?? {}) } as Record<string, number | null>;
+					delete nextHandicaps[curKey];
+					const nextDay2Adj = { ...(current.day2HandicapAdjustments ?? {}) } as Record<string, number | null>;
+					delete nextDay2Adj[curKey];
+					const nextCharity = { ...(current.charityStrokes ?? {}) } as Record<string, number | null>;
+					delete nextCharity[curKey];
+					const nextTree = { ...(current.treeStrokes ?? {}) } as Record<string, number | null>;
+					delete nextTree[curKey];
+					const nextTeeChoices = {
+						day1: { ...(current.teeChoices?.day1 ?? {}) } as Record<string, TeeKey | null>,
+						day2: { ...(current.teeChoices?.day2 ?? {}) } as Record<string, TeeKey | null>,
+					};
+					delete nextTeeChoices.day1[curKey];
+					delete nextTeeChoices.day2[curKey];
+					const nextScoresByDay = coerceScoresByDay(nextPlayers, current.scores);
 
-				// Normalize scores to the newer { day1, day2 } format and drop the deleted player.
-				const nextScoresByDay = coerceScoresByDay(nextPlayers, current.scores);
-
-				await updateDoc(doc(db, "groups", gid), {
-					playerNames: nextPlayers,
-					playerNamesByDay: {
-						day1: nextDay1,
-						day2: nextDay2,
-					},
-					handicaps: nextHandicaps,
-					day2HandicapAdjustments: nextDay2Adj,
-					charityStrokes: nextCharity,
-					treeStrokes: nextTree,
-					teeChoices: nextTeeChoices,
-					scores: nextScoresByDay,
-					updatedAt: serverTimestamp(),
-				});
-			} catch (err) {
-				const message = err instanceof Error ? err.message : String(err);
-				setError(`Could not delete player: ${message}`);
+					await updateDoc(doc(db, "groups", gid), {
+						playerNames: nextPlayers,
+						playerNamesByDay: { day1: nextDay1, day2: nextDay2 },
+						handicaps: nextHandicaps,
+						day2HandicapAdjustments: nextDay2Adj,
+						charityStrokes: nextCharity,
+						treeStrokes: nextTree,
+						teeChoices: nextTeeChoices,
+						scores: nextScoresByDay,
+						updatedAt: serverTimestamp(),
+					});
+				} catch (err) {
+					const message = err instanceof Error ? err.message : String(err);
+					setError(`Could not delete player from group ${gid}: ${message}`);
+				}
 			}
 		}
-
-	async function savePlayerEdits(opts: { gid: string; player: string; day: DayKey }) {
+	async function savePlayerEdits(opts: { player: string; currentDay1Gid: string | null; currentDay2Gid: string | null }) {
 		if (!isAdmin) {
 			setError("Admin access required.");
 			return;
 		}
-		const { gid, player, day } = opts;
-		const moveDay = day;
-		const otherDay: DayKey = moveDay === "day1" ? "day2" : "day1";
-		const key = editKey(gid, player);
+		const { player, currentDay1Gid, currentDay2Gid } = opts;
+		const key = editKey(player);
 		const edit = playerEdits[key];
-		const moveToGid = edit?.moveToGid?.trim();
 		const nameDraft = (edit?.name ?? player).trim();
 		const nextName = nameDraft || player;
-		const groupRow = allGroups.find((g) => g.id === gid);
-		if (!groupRow) return;
 
-		const current = groupRow.data;
+		const primaryGid = currentDay1Gid ?? currentDay2Gid;
+		if (!primaryGid) return;
+		const primaryGroup = allGroups.find((g) => g.id === primaryGid);
+		if (!primaryGroup) return;
+		const current = primaryGroup.data;
+
 		const currentHandicap = current.handicaps?.[player] ?? 0;
 		const currentDay2Adj = current.day2HandicapAdjustments?.[player] ?? 0;
 		const currentCharity = current.charityStrokes?.[player] ?? 0;
@@ -484,24 +496,29 @@ export default function GroupAdminPage() {
 		const day2AdjNum = Math.floor(Number(day2AdjRaw || 0));
 		const charityNum = Math.floor(Number(charityRaw || 0));
 		const treeNum = Math.floor(Number(treeRaw || 0));
-
 		const safeHandicap = Number.isFinite(handicapNum) ? handicapNum : 0;
 		const safeDay2Adj = Number.isFinite(day2AdjNum) ? day2AdjNum : 0;
 		const safeCharity = Number.isFinite(charityNum) ? charityNum : 0;
 		const safeTree = Number.isFinite(treeNum) ? treeNum : 0;
 
+		const newDay1Gid = edit?.moveToGidDay1 !== undefined ? edit.moveToGidDay1 : currentDay1Gid;
+		const newDay2Gid = edit?.moveToGidDay2 !== undefined ? edit.moveToGidDay2 : currentDay2Gid;
+		const day1MoveNeeded = currentDay1Gid !== null && newDay1Gid !== null && newDay1Gid !== currentDay1Gid;
+		const day2MoveNeeded = currentDay2Gid !== null && newDay2Gid !== null && newDay2Gid !== currentDay2Gid;
+		const nameChanged = nextName.trim().toLowerCase() !== player.trim().toLowerCase();
+
 		setSavingPlayerKey(key);
 		setError(null);
 		try {
-			if (moveToGid && moveToGid !== gid) {
+			// Handle day 1 group move
+			if (day1MoveNeeded && currentDay1Gid && newDay1Gid) {
 				await runTransaction(db, async (tx) => {
-					const fromRef = doc(db, "groups", gid);
-					const toRef = doc(db, "groups", moveToGid);
+					const fromRef = doc(db, "groups", currentDay1Gid);
+					const toRef = doc(db, "groups", newDay1Gid);
 					const fromSnap = await tx.get(fromRef);
 					const toSnap = await tx.get(toRef);
 					if (!fromSnap.exists()) throw new Error("Source group not found");
 					if (!toSnap.exists()) throw new Error("Target group not found");
-
 					const from = fromSnap.data() as GroupDoc;
 					const to = toSnap.data() as GroupDoc;
 					const fromLegacy = (from.playerNames ?? []).filter(Boolean);
@@ -510,112 +527,110 @@ export default function GroupAdminPage() {
 					const fromDay2 = ((from.playerNamesByDay?.day2 ?? fromLegacy) as string[]).filter(Boolean);
 					const toDay1 = ((to.playerNamesByDay?.day1 ?? toLegacy) as string[]).filter(Boolean);
 					const toDay2 = ((to.playerNamesByDay?.day2 ?? toLegacy) as string[]).filter(Boolean);
-
-					const fromRoster = moveDay === "day1" ? fromDay1 : fromDay2;
-					const toRoster = moveDay === "day1" ? toDay1 : toDay2;
-					const fromKey = findPlayerKey(fromRoster, player);
+					const fromKey = findPlayerKey(fromDay1, player);
 					if (!fromKey) return;
 					const loweredFrom = fromKey.toLowerCase();
 					const toKey = nextName;
-					const loweredTo = toKey.trim().toLowerCase();
 					if (!toKey.trim()) throw new Error("Player name is required.");
-					const toExisting = toRoster.find((p) => p.toLowerCase() === loweredTo) ?? null;
-					if (toExisting) throw new Error(`Player already exists in target foursome (${toExisting}).`);
-
-					const nextFromDay1 =
-						moveDay === "day1" ? fromDay1.filter((p) => p.toLowerCase() !== loweredFrom) : fromDay1;
-					const nextFromDay2 =
-						moveDay === "day2" ? fromDay2.filter((p) => p.toLowerCase() !== loweredFrom) : fromDay2;
-					const nextToDay1 = moveDay === "day1" ? [...toDay1, toKey] : toDay1;
-					const nextToDay2 = moveDay === "day2" ? [...toDay2, toKey] : toDay2;
-
-					const nextFromPlayers = uniqPreserveOrder([...nextFromDay1, ...nextFromDay2]);
-					const nextToPlayers = uniqPreserveOrder([...nextToDay1, ...nextToDay2]);
+					const toExisting = toDay1.find((p) => p.toLowerCase() === toKey.trim().toLowerCase()) ?? null;
+					if (toExisting) throw new Error(`Player already exists in Day 1 target foursome (${toExisting}).`);
+					const nextFromDay1 = fromDay1.filter((p) => p.toLowerCase() !== loweredFrom);
+					const nextToDay1 = [...toDay1, toKey];
+					const nextFromPlayers = uniqPreserveOrder([...nextFromDay1, ...fromDay2]);
+					const nextToPlayers = uniqPreserveOrder([...nextToDay1, ...toDay2]);
 					const stillInFrom = nextFromPlayers.some((p) => p.toLowerCase() === loweredFrom);
-
 					const nextFromHandicaps = { ...(from.handicaps ?? {}) } as Record<string, number | null>;
 					const nextFromDay2Adj = { ...(from.day2HandicapAdjustments ?? {}) } as Record<string, number | null>;
 					const nextFromCharity = { ...(from.charityStrokes ?? {}) } as Record<string, number | null>;
 					const nextFromTree = { ...(from.treeStrokes ?? {}) } as Record<string, number | null>;
-					if (!stillInFrom) {
-						delete nextFromHandicaps[fromKey];
-						delete nextFromDay2Adj[fromKey];
-						delete nextFromCharity[fromKey];
-						delete nextFromTree[fromKey];
-					}
+					if (!stillInFrom) { delete nextFromHandicaps[fromKey]; delete nextFromDay2Adj[fromKey]; delete nextFromCharity[fromKey]; delete nextFromTree[fromKey]; }
 					const nextFromTeeChoices = {
 						day1: { ...(from.teeChoices?.day1 ?? {}) } as Record<string, TeeKey | null>,
 						day2: { ...(from.teeChoices?.day2 ?? {}) } as Record<string, TeeKey | null>,
 					};
-					delete nextFromTeeChoices[moveDay][fromKey];
-					if (!stillInFrom) {
-						delete nextFromTeeChoices.day1[fromKey];
-						delete nextFromTeeChoices.day2[fromKey];
-					}
-
+					delete nextFromTeeChoices.day1[fromKey];
+					if (!stillInFrom) delete nextFromTeeChoices.day2[fromKey];
 					const fromBeforePlayers = uniqPreserveOrder([...fromDay1, ...fromDay2]);
 					const toBeforePlayers = uniqPreserveOrder([...toDay1, ...toDay2]);
 					const fromScoresByDay = coerceScoresByDay(fromBeforePlayers, from.scores);
 					const toScoresByDay = coerceScoresByDay(toBeforePlayers, to.scores);
-					const moved =
-						(moveDay === "day1" ? fromScoresByDay.day1[fromKey] : fromScoresByDay.day2[fromKey]) ??
-						Array.from({ length: HOLE_COUNT }, () => null);
-					if (moveDay === "day1") {
-						delete fromScoresByDay.day1[fromKey];
-						toScoresByDay.day1[toKey] = moved;
-					} else {
-						delete fromScoresByDay.day2[fromKey];
-						toScoresByDay.day2[toKey] = moved;
-					}
+					const movedScores = fromScoresByDay.day1[fromKey] ?? Array.from({ length: HOLE_COUNT }, () => null);
+					delete fromScoresByDay.day1[fromKey];
+					toScoresByDay.day1[toKey] = movedScores;
 					const nextFromScoresByDay = coerceScoresByDay(nextFromPlayers, fromScoresByDay as any);
 					const nextToScoresByDay = coerceScoresByDay(nextToPlayers, toScoresByDay as any);
-
-					const nextToHandicaps = { ...(to.handicaps ?? {}), [toKey]: safeHandicap };
-					const nextToDay2Adj = { ...(to.day2HandicapAdjustments ?? {}), [toKey]: safeDay2Adj };
-					const nextToCharity = { ...(to.charityStrokes ?? {}), [toKey]: safeCharity };
-					const nextToTree = { ...(to.treeStrokes ?? {}), [toKey]: safeTree };
-					const nextToTeeChoices = {
-						day1: { ...(to.teeChoices?.day1 ?? {}) } as Record<string, TeeKey | null>,
-						day2: { ...(to.teeChoices?.day2 ?? {}) } as Record<string, TeeKey | null>,
-					};
-					if (moveDay === "day1") nextToTeeChoices.day1[toKey] = teeDay1;
-					if (moveDay === "day2") nextToTeeChoices.day2[toKey] = teeDay2;
-
-					tx.update(fromRef, {
-						playerNames: nextFromPlayers,
-						playerNamesByDay: {
-							day1: nextFromDay1,
-							day2: nextFromDay2,
-						},
-						handicaps: nextFromHandicaps,
-						day2HandicapAdjustments: nextFromDay2Adj,
-						charityStrokes: nextFromCharity,
-						treeStrokes: nextFromTree,
-						teeChoices: nextFromTeeChoices,
-						scores: nextFromScoresByDay,
-						updatedAt: serverTimestamp(),
-					});
-					tx.update(toRef, {
-						playerNames: nextToPlayers,
-						playerNamesByDay: {
-							day1: nextToDay1,
-							day2: nextToDay2,
-						},
-						handicaps: nextToHandicaps,
-						day2HandicapAdjustments: nextToDay2Adj,
-						charityStrokes: nextToCharity,
-						treeStrokes: nextToTree,
-						teeChoices: nextToTeeChoices,
-						scores: nextToScoresByDay,
-						updatedAt: serverTimestamp(),
-					});
+					tx.update(fromRef, { playerNames: nextFromPlayers, playerNamesByDay: { day1: nextFromDay1, day2: fromDay2 }, handicaps: nextFromHandicaps, day2HandicapAdjustments: nextFromDay2Adj, charityStrokes: nextFromCharity, treeStrokes: nextFromTree, teeChoices: nextFromTeeChoices, scores: nextFromScoresByDay, updatedAt: serverTimestamp() });
+					tx.update(toRef, { playerNames: nextToPlayers, playerNamesByDay: { day1: nextToDay1, day2: toDay2 }, handicaps: { ...(to.handicaps ?? {}), [toKey]: safeHandicap }, day2HandicapAdjustments: { ...(to.day2HandicapAdjustments ?? {}), [toKey]: safeDay2Adj }, charityStrokes: { ...(to.charityStrokes ?? {}), [toKey]: safeCharity }, treeStrokes: { ...(to.treeStrokes ?? {}), [toKey]: safeTree }, teeChoices: { day1: { ...(to.teeChoices?.day1 ?? {}), [toKey]: teeDay1 }, day2: { ...(to.teeChoices?.day2 ?? {}) } }, scores: nextToScoresByDay, updatedAt: serverTimestamp() });
 				});
-			} else {
-				if (nextName.trim().toLowerCase() !== player.trim().toLowerCase()) {
+			}
+
+			// Handle day 2 group move
+			if (day2MoveNeeded && currentDay2Gid && newDay2Gid) {
+				await runTransaction(db, async (tx) => {
+					const fromRef = doc(db, "groups", currentDay2Gid);
+					const toRef = doc(db, "groups", newDay2Gid);
+					const fromSnap = await tx.get(fromRef);
+					const toSnap = await tx.get(toRef);
+					if (!fromSnap.exists()) throw new Error("Source group not found");
+					if (!toSnap.exists()) throw new Error("Target group not found");
+					const from = fromSnap.data() as GroupDoc;
+					const to = toSnap.data() as GroupDoc;
+					const fromLegacy = (from.playerNames ?? []).filter(Boolean);
+					const toLegacy = (to.playerNames ?? []).filter(Boolean);
+					const fromDay1 = ((from.playerNamesByDay?.day1 ?? fromLegacy) as string[]).filter(Boolean);
+					const fromDay2 = ((from.playerNamesByDay?.day2 ?? fromLegacy) as string[]).filter(Boolean);
+					const toDay1 = ((to.playerNamesByDay?.day1 ?? toLegacy) as string[]).filter(Boolean);
+					const toDay2 = ((to.playerNamesByDay?.day2 ?? toLegacy) as string[]).filter(Boolean);
+					const fromKey = findPlayerKey(fromDay2, player);
+					if (!fromKey) return;
+					const loweredFrom = fromKey.toLowerCase();
+					const toKey = nextName;
+					if (!toKey.trim()) throw new Error("Player name is required.");
+					const toExisting = toDay2.find((p) => p.toLowerCase() === toKey.trim().toLowerCase()) ?? null;
+					if (toExisting) throw new Error(`Player already exists in Day 2 target foursome (${toExisting}).`);
+					const nextFromDay2 = fromDay2.filter((p) => p.toLowerCase() !== loweredFrom);
+					const nextToDay2 = [...toDay2, toKey];
+					const nextFromPlayers = uniqPreserveOrder([...fromDay1, ...nextFromDay2]);
+					const nextToPlayers = uniqPreserveOrder([...toDay1, ...nextToDay2]);
+					const stillInFrom = nextFromPlayers.some((p) => p.toLowerCase() === loweredFrom);
+					const nextFromHandicaps = { ...(from.handicaps ?? {}) } as Record<string, number | null>;
+					const nextFromDay2Adj = { ...(from.day2HandicapAdjustments ?? {}) } as Record<string, number | null>;
+					const nextFromCharity = { ...(from.charityStrokes ?? {}) } as Record<string, number | null>;
+					const nextFromTree = { ...(from.treeStrokes ?? {}) } as Record<string, number | null>;
+					if (!stillInFrom) { delete nextFromHandicaps[fromKey]; delete nextFromDay2Adj[fromKey]; delete nextFromCharity[fromKey]; delete nextFromTree[fromKey]; }
+					const nextFromTeeChoices = {
+						day1: { ...(from.teeChoices?.day1 ?? {}) } as Record<string, TeeKey | null>,
+						day2: { ...(from.teeChoices?.day2 ?? {}) } as Record<string, TeeKey | null>,
+					};
+					delete nextFromTeeChoices.day2[fromKey];
+					if (!stillInFrom) delete nextFromTeeChoices.day1[fromKey];
+					const fromBeforePlayers = uniqPreserveOrder([...fromDay1, ...fromDay2]);
+					const toBeforePlayers = uniqPreserveOrder([...toDay1, ...toDay2]);
+					const fromScoresByDay = coerceScoresByDay(fromBeforePlayers, from.scores);
+					const toScoresByDay = coerceScoresByDay(toBeforePlayers, to.scores);
+					const movedScores = fromScoresByDay.day2[fromKey] ?? Array.from({ length: HOLE_COUNT }, () => null);
+					delete fromScoresByDay.day2[fromKey];
+					toScoresByDay.day2[toKey] = movedScores;
+					const nextFromScoresByDay = coerceScoresByDay(nextFromPlayers, fromScoresByDay as any);
+					const nextToScoresByDay = coerceScoresByDay(nextToPlayers, toScoresByDay as any);
+					tx.update(fromRef, { playerNames: nextFromPlayers, playerNamesByDay: { day1: fromDay1, day2: nextFromDay2 }, handicaps: nextFromHandicaps, day2HandicapAdjustments: nextFromDay2Adj, charityStrokes: nextFromCharity, treeStrokes: nextFromTree, teeChoices: nextFromTeeChoices, scores: nextFromScoresByDay, updatedAt: serverTimestamp() });
+					tx.update(toRef, { playerNames: nextToPlayers, playerNamesByDay: { day1: toDay1, day2: nextToDay2 }, handicaps: { ...(to.handicaps ?? {}), [toKey]: safeHandicap }, day2HandicapAdjustments: { ...(to.day2HandicapAdjustments ?? {}), [toKey]: safeDay2Adj }, charityStrokes: { ...(to.charityStrokes ?? {}), [toKey]: safeCharity }, treeStrokes: { ...(to.treeStrokes ?? {}), [toKey]: safeTree }, teeChoices: { day1: { ...(to.teeChoices?.day1 ?? {}) }, day2: { ...(to.teeChoices?.day2 ?? {}), [toKey]: teeDay2 } }, scores: nextToScoresByDay, updatedAt: serverTimestamp() });
+				});
+			}
+
+			// Handle rename (no group moves)
+			if (nameChanged && !day1MoveNeeded && !day2MoveNeeded) {
+				const groupsWithPlayer = allGroups.filter((g) => {
+					const legacy = (g.data.playerNames ?? []).filter(Boolean);
+					const d1 = ((g.data.playerNamesByDay?.day1 ?? legacy) as string[]).filter(Boolean);
+					const d2 = ((g.data.playerNamesByDay?.day2 ?? legacy) as string[]).filter(Boolean);
+					return [...d1, ...d2].some((p) => p.toLowerCase() === player.toLowerCase());
+				});
+				for (const groupRow of groupsWithPlayer) {
 					await runTransaction(db, async (tx) => {
-						const ref = doc(db, "groups", gid);
+						const ref = doc(db, "groups", groupRow.id);
 						const snap = await tx.get(ref);
-						if (!snap.exists()) throw new Error("Group not found");
+						if (!snap.exists()) return;
 						const cur = snap.data() as GroupDoc;
 						const legacy = (cur.playerNames ?? []).filter(Boolean);
 						const curDay1 = ((cur.playerNamesByDay?.day1 ?? legacy) as string[]).filter(Boolean);
@@ -625,13 +640,11 @@ export default function GroupAdminPage() {
 						if (!curKey) return;
 						const nextKey = nextName.trim();
 						if (!nextKey) throw new Error("Player name is required.");
-						const exists = curPlayers.find((p) => p.toLowerCase() === nextKey.toLowerCase());
+						const exists = curPlayers.find((p) => p.toLowerCase() === nextKey.toLowerCase() && p.toLowerCase() !== curKey.toLowerCase());
 						if (exists) throw new Error(`Player already exists (${exists}).`);
-
 						const nextPlayers = curPlayers.map((p) => (p.toLowerCase() === curKey.toLowerCase() ? nextKey : p));
 						const nextDay1 = curDay1.map((p) => (p.toLowerCase() === curKey.toLowerCase() ? nextKey : p));
 						const nextDay2 = curDay2.map((p) => (p.toLowerCase() === curKey.toLowerCase() ? nextKey : p));
-
 						const curScoresByDay = coerceScoresByDay(curPlayers, cur.scores);
 						const movedDay1 = curScoresByDay.day1[curKey] ?? Array.from({ length: HOLE_COUNT }, () => null);
 						const movedDay2 = curScoresByDay.day2[curKey] ?? Array.from({ length: HOLE_COUNT }, () => null);
@@ -640,90 +653,51 @@ export default function GroupAdminPage() {
 						nextScoresByDay.day2[nextKey] = movedDay2;
 						delete nextScoresByDay.day1[curKey];
 						delete nextScoresByDay.day2[curKey];
-
-						const nextHandicaps = { ...(cur.handicaps ?? {}) } as Record<string, number | null>;
-						nextHandicaps[nextKey] = safeHandicap;
+						const nextHandicaps = { ...(cur.handicaps ?? {}), [nextKey]: safeHandicap } as Record<string, number | null>;
 						delete nextHandicaps[curKey];
-						const nextDay2Adj = { ...(cur.day2HandicapAdjustments ?? {}) } as Record<string, number | null>;
-						nextDay2Adj[nextKey] = safeDay2Adj;
+						const nextDay2Adj = { ...(cur.day2HandicapAdjustments ?? {}), [nextKey]: safeDay2Adj } as Record<string, number | null>;
 						delete nextDay2Adj[curKey];
-						const nextCharity = { ...(cur.charityStrokes ?? {}) } as Record<string, number | null>;
-						nextCharity[nextKey] = safeCharity;
+						const nextCharity = { ...(cur.charityStrokes ?? {}), [nextKey]: safeCharity } as Record<string, number | null>;
 						delete nextCharity[curKey];
-						const nextTree = { ...(cur.treeStrokes ?? {}) } as Record<string, number | null>;
-						nextTree[nextKey] = safeTree;
+						const nextTree = { ...(cur.treeStrokes ?? {}), [nextKey]: safeTree } as Record<string, number | null>;
 						delete nextTree[curKey];
 						const nextTeeChoices = {
-							day1: { ...(cur.teeChoices?.day1 ?? {}) } as Record<string, TeeKey | null>,
-							day2: { ...(cur.teeChoices?.day2 ?? {}) } as Record<string, TeeKey | null>,
+							day1: { ...(cur.teeChoices?.day1 ?? {}), [nextKey]: teeDay1 } as Record<string, TeeKey | null>,
+							day2: { ...(cur.teeChoices?.day2 ?? {}), [nextKey]: teeDay2 } as Record<string, TeeKey | null>,
 						};
-						nextTeeChoices.day1[nextKey] = teeDay1;
 						delete nextTeeChoices.day1[curKey];
-						nextTeeChoices.day2[nextKey] = teeDay2;
 						delete nextTeeChoices.day2[curKey];
-
-						tx.update(ref, {
-							playerNames: nextPlayers,
-							playerNamesByDay: {
-								day1: nextDay1,
-								day2: nextDay2,
-							},
-							handicaps: nextHandicaps,
-							day2HandicapAdjustments: nextDay2Adj,
-							charityStrokes: nextCharity,
-							treeStrokes: nextTree,
-							teeChoices: nextTeeChoices,
-							scores: nextScoresByDay,
-							updatedAt: serverTimestamp(),
-						});
-					});
-				} else {
-					const nextHandicaps = { ...(current.handicaps ?? {}), [player]: safeHandicap };
-					const nextDay2Adj = { ...(current.day2HandicapAdjustments ?? {}), [player]: safeDay2Adj };
-					const nextCharity = { ...(current.charityStrokes ?? {}), [player]: safeCharity };
-					const nextTree = { ...(current.treeStrokes ?? {}), [player]: safeTree };
-					const nextTeeChoices = {
-						day1: { ...(current.teeChoices?.day1 ?? {}), [player]: teeDay1 },
-						day2: { ...(current.teeChoices?.day2 ?? {}), [player]: teeDay2 },
-					};
-
-					const lowered = player.trim().toLowerCase();
-					const groupsToUpdate = uniqPreserveOrder(
-						allGroups
-							.filter((g) => {
-								const legacy = (g.data.playerNames ?? []).filter(Boolean);
-								const d1 = ((g.data.playerNamesByDay?.day1 ?? legacy) as string[]).filter(Boolean);
-								const d2 = ((g.data.playerNamesByDay?.day2 ?? legacy) as string[]).filter(Boolean);
-								return [...d1, ...d2].some((p) => p.toLowerCase() === lowered);
-							})
-							.map((g) => g.id)
-					);
-					const targets = groupsToUpdate.length ? groupsToUpdate : [gid];
-					await runTransaction(db, async (tx) => {
-						for (const targetGid of targets) {
-							const ref = doc(db, "groups", targetGid);
-							const snap = await tx.get(ref);
-							if (!snap.exists()) continue;
-							const cur = snap.data() as GroupDoc;
-							const mergedHandicaps = { ...(cur.handicaps ?? {}), [player]: safeHandicap };
-							const mergedDay2Adj = { ...(cur.day2HandicapAdjustments ?? {}), [player]: safeDay2Adj };
-							const mergedCharity = { ...(cur.charityStrokes ?? {}), [player]: safeCharity };
-							const mergedTree = { ...(cur.treeStrokes ?? {}), [player]: safeTree };
-							const mergedTeeChoices = {
-								day1: { ...(cur.teeChoices?.day1 ?? {}), [player]: teeDay1 },
-								day2: { ...(cur.teeChoices?.day2 ?? {}), [player]: teeDay2 },
-							};
-							tx.update(ref, {
-								handicaps: mergedHandicaps,
-								day2HandicapAdjustments: mergedDay2Adj,
-								charityStrokes: mergedCharity,
-								treeStrokes: mergedTree,
-								teeChoices: mergedTeeChoices,
-								updatedAt: serverTimestamp(),
-							});
-						}
+						tx.update(ref, { playerNames: nextPlayers, playerNamesByDay: { day1: nextDay1, day2: nextDay2 }, handicaps: nextHandicaps, day2HandicapAdjustments: nextDay2Adj, charityStrokes: nextCharity, treeStrokes: nextTree, teeChoices: nextTeeChoices, scores: nextScoresByDay, updatedAt: serverTimestamp() });
 					});
 				}
+			}
+
+			// Handle data-only updates
+			if (!day1MoveNeeded && !day2MoveNeeded && !nameChanged) {
+				const lowered = player.trim().toLowerCase();
+				const groupsToUpdate = allGroups.filter((g) => {
+					const legacy = (g.data.playerNames ?? []).filter(Boolean);
+					const d1 = ((g.data.playerNamesByDay?.day1 ?? legacy) as string[]).filter(Boolean);
+					const d2 = ((g.data.playerNamesByDay?.day2 ?? legacy) as string[]).filter(Boolean);
+					return [...d1, ...d2].some((p) => p.toLowerCase() === lowered);
+				});
+				const targets = groupsToUpdate.length ? groupsToUpdate.map((g) => g.id) : [primaryGid];
+				await runTransaction(db, async (tx) => {
+					for (const targetGid of targets) {
+						const ref = doc(db, "groups", targetGid);
+						const snap = await tx.get(ref);
+						if (!snap.exists()) continue;
+						const cur = snap.data() as GroupDoc;
+						tx.update(ref, {
+							handicaps: { ...(cur.handicaps ?? {}), [player]: safeHandicap },
+							day2HandicapAdjustments: { ...(cur.day2HandicapAdjustments ?? {}), [player]: safeDay2Adj },
+							charityStrokes: { ...(cur.charityStrokes ?? {}), [player]: safeCharity },
+							treeStrokes: { ...(cur.treeStrokes ?? {}), [player]: safeTree },
+							teeChoices: { day1: { ...(cur.teeChoices?.day1 ?? {}), [player]: teeDay1 }, day2: { ...(cur.teeChoices?.day2 ?? {}), [player]: teeDay2 } },
+							updatedAt: serverTimestamp(),
+						});
+					}
+				});
 			}
 
 			setPlayerEdits((prev) => {
@@ -745,29 +719,13 @@ export default function GroupAdminPage() {
 		}
 		setAddPlayerError(null);
 		const name = addPlayerName.trim();
-		const foursomeNum = Math.floor(Number(addPlayerFoursome || 0));
 		if (!name) {
 			setAddPlayerError("Enter a player name.");
 			return;
 		}
-		if (!Number.isFinite(foursomeNum) || foursomeNum <= 0) {
-			setAddPlayerError("Enter a valid foursome number (1,2,3,…). ");
-			return;
-		}
-		const gid = gidByFoursomeNumber.get(foursomeNum);
-		if (!gid) {
-			setAddPlayerError(`Foursome ${foursomeNum} not found. Create it first.`);
-			return;
-		}
-
+		const gid = groupId;
 		const handicapNum = Math.floor(Number(addPlayerHandicap || 0));
-		const day2AdjNum = Math.floor(Number(addPlayerDay2Adj || 0));
-		const charityNum = Math.floor(Number(addPlayerCharity || 0));
-		const treeNum = Math.floor(Number(addPlayerTree || 0));
 		const safeHandicap = Number.isFinite(handicapNum) ? handicapNum : 0;
-		const safeDay2Adj = Number.isFinite(day2AdjNum) ? day2AdjNum : 0;
-		const safeCharity = Number.isFinite(charityNum) ? charityNum : 0;
-		const safeTree = Number.isFinite(treeNum) ? treeNum : 0;
 
 		setAddingPlayer(true);
 		try {
@@ -785,38 +743,21 @@ export default function GroupAdminPage() {
 				const nextDay1 = uniqPreserveOrder([...curDay1, name]);
 				const nextDay2 = uniqPreserveOrder([...curDay2, name]);
 				const nextPlayers = uniqPreserveOrder([...nextDay1, ...nextDay2]);
-
-				const nextHandicaps = { ...(cur.handicaps ?? {}), [name]: safeHandicap };
-				const nextDay2Adj = { ...(cur.day2HandicapAdjustments ?? {}), [name]: safeDay2Adj };
-				const nextCharity = { ...(cur.charityStrokes ?? {}), [name]: safeCharity };
-				const nextTree = { ...(cur.treeStrokes ?? {}), [name]: safeTree };
-				const nextTeeChoices = {
-					day1: { ...(cur.teeChoices?.day1 ?? {}), [name]: addPlayerTeeDay1 },
-					day2: { ...(cur.teeChoices?.day2 ?? {}), [name]: addPlayerTeeDay2 },
-				};
 				const nextScoresByDay = coerceScoresByDay(nextPlayers, cur.scores);
-
 				tx.update(ref, {
 					playerNames: nextPlayers,
-					playerNamesByDay: {
-						day1: nextDay1,
-						day2: nextDay2,
-					},
-					handicaps: nextHandicaps,
-					day2HandicapAdjustments: nextDay2Adj,
-					charityStrokes: nextCharity,
-					treeStrokes: nextTree,
-					teeChoices: nextTeeChoices,
+					playerNamesByDay: { day1: nextDay1, day2: nextDay2 },
+					handicaps: { ...(cur.handicaps ?? {}), [name]: safeHandicap },
+					day2HandicapAdjustments: { ...(cur.day2HandicapAdjustments ?? {}), [name]: 0 },
+					charityStrokes: { ...(cur.charityStrokes ?? {}), [name]: 0 },
+					treeStrokes: { ...(cur.treeStrokes ?? {}), [name]: 0 },
+					teeChoices: { day1: { ...(cur.teeChoices?.day1 ?? {}), [name]: "combo" as TeeKey }, day2: { ...(cur.teeChoices?.day2 ?? {}), [name]: "stampede" as TeeKey } },
 					scores: nextScoresByDay,
 					updatedAt: serverTimestamp(),
 				});
 			});
-
 			setAddPlayerName("");
 			setAddPlayerHandicap("0");
-			setAddPlayerDay2Adj("0");
-			setAddPlayerCharity("0");
-			setAddPlayerTree("0");
 		} catch (err) {
 			const message = err instanceof Error ? err.message : String(err);
 			setAddPlayerError(message);
@@ -913,74 +854,6 @@ export default function GroupAdminPage() {
 	}
 
 
-	async function createNewGroup(openAfterCreate: boolean) {
-		if (!isAdmin) {
-			setError("Admin access required.");
-			return;
-		}
-		setCreateGroupError(null);
-		setCreatedGroupId(null);
-		const pin = newPinDraft.trim();
-		const n = Math.floor(Number(newFoursomeNumberDraft || 0));
-		const name = Number.isFinite(n) && n > 0 ? `Foursome ${n}` : "";
-		const players = uniqPreserveOrder(parsePlayersDraft(newPlayersDraft));
-		if (!pin) {
-			setCreateGroupError("Enter a PIN for the new group.");
-			return;
-		}
-		if (!name) {
-			setCreateGroupError("Enter a foursome number (1,2,3,…).");
-			return;
-		}
-		if (players.length === 0) {
-			setCreateGroupError("Enter at least one player for the new group.");
-			return;
-		}
-
-		setCreatingGroup(true);
-		try {
-			const tournament = group?.tournament ?? {};
-			const payload: GroupDoc = {
-				groupName: name || null || undefined,
-				pin,
-				playerNames: players,
-				playerNamesByDay: {
-					day1: players,
-					day2: players,
-				},
-				day1ScoresLocked: false,
-				scores: coerceScoresByDay(players, undefined),
-				handicaps: coerceNumberMap(players, null, 0),
-				day2HandicapAdjustments: coerceNumberMap(players, null, 0),
-				teeChoices: {
-					day1: coerceTeeMap(players, null, "combo"),
-					day2: coerceTeeMap(players, null, "stampede"),
-				},
-				charityStrokes: coerceNumberMap(players, null, 0),
-				treeStrokes: coerceNumberMap(players, null, 0),
-				tournament: {
-					...tournament,
-				},
-			};
-
-			const ref = await addDoc(collection(db, "groups"), {
-				...payload,
-				createdAt: serverTimestamp(),
-				updatedAt: serverTimestamp(),
-			});
-			setCreatedGroupId(ref.id);
-			setNewFoursomeNumberDraft("");
-			setNewPinDraft("");
-			setNewPlayersDraft("");
-			if (openAfterCreate) router.push(`/group/${ref.id}/admin`);
-		} catch (err) {
-			const message = err instanceof Error ? err.message : String(err);
-			setCreateGroupError(`Could not create group: ${message}`);
-		} finally {
-			setCreatingGroup(false);
-		}
-	}
-
 	if (loading) return <main className="min-h-screen bg-sky-50 text-slate-900 p-6">Loading…</main>;
 	if (error) return <main className="min-h-screen bg-sky-50 text-slate-900 p-6">{error}</main>;
 	if (!group) return <main className="min-h-screen bg-sky-50 text-slate-900 p-6">Missing group.</main>;
@@ -998,7 +871,7 @@ export default function GroupAdminPage() {
 							onClick={() => router.push("/")}
 							className="bg-white hover:bg-sky-50 border border-sky-200 px-4 py-2 rounded-lg text-sm"
 						>
-							Back to PIN login
+							Back to home
 						</button>
 						<button
 							onClick={() => router.push(`/group/${groupId}`)}
@@ -1085,27 +958,13 @@ export default function GroupAdminPage() {
 						<div className="mt-6 bg-white/80 border border-sky-200 rounded-2xl p-5">
 							<div className="flex items-center justify-between gap-3 flex-wrap">
 								<h2 className="text-lg font-semibold">All players (all foursomes)</h2>
-								<div className="inline-flex rounded-lg border border-sky-200 overflow-hidden bg-white/70">
-									<button
-										onClick={() => setRosterDay("day1")}
-										className={`px-4 py-2 text-sm ${rosterDay === "day1" ? "bg-sky-600 text-white" : "bg-white/60 hover:bg-white"}`}
-									>
-										Day 1
-									</button>
-									<button
-										onClick={() => setRosterDay("day2")}
-										className={`px-4 py-2 text-sm ${rosterDay === "day2" ? "bg-sky-600 text-white" : "bg-white/60 hover:bg-white"}`}
-									>
-										Day 2
-									</button>
-								</div>
 								{allGroupsLoading ? (
 									<p className="text-sm text-slate-600">Loading…</p>
 								) : (
-									<p className="text-sm text-slate-600">{allGroups.length} groups</p>
+									<p className="text-sm text-slate-600">{allGroups.length} groups · {allPlayersRoster.length} players</p>
 								)}
 							</div>
-							<p className="text-slate-600 text-sm mt-1">Edit handicaps/tees/charity here. You can also move a player to a different foursome.</p>
+							<p className="text-slate-600 text-sm mt-1">Edit handicaps/tees/charity here. Assign day 1 and day 2 foursomes per player using the dropdowns.</p>
 							{allGroupsError ? <p className="text-sm text-red-600 mt-2">{allGroupsError}</p> : null}
 
 							<div className="mt-3 overflow-x-auto">
@@ -1113,10 +972,10 @@ export default function GroupAdminPage() {
 									<thead>
 										<tr className="text-left text-slate-700">
 											<th className="p-2 min-w-[220px]">Player</th>
-											<th className="p-2 pr-1 min-w-[92px]">Foursome</th>
-												<th className="p-2 pl-1 min-w-[70px]">PIN</th>
-											<th className="p-2">Hndcp</th>
-											<th className="p-2">D2 Adj</th>
+											<th className="p-2 min-w-[80px]">D1 Group</th>
+											<th className="p-2 min-w-[80px]">D2 Group</th>
+											<th className="p-2">D1 HCP</th>
+											<th className="p-2">D2 HCP</th>
 											<th className="p-2">Day 1 tee</th>
 											<th className="p-2">Day 2 tee</th>
 											<th className="p-2">Char</th>
@@ -1125,169 +984,175 @@ export default function GroupAdminPage() {
 										</tr>
 									</thead>
 									<tbody>
-										{allGroups
-											.flatMap((g) => {
-												const gTitle = getGroupTitle(g.data, g.id);
-												const gPin = g.data.pin ?? "";
-												const legacy = (g.data.playerNames ?? []).filter(Boolean);
-												const gPlayers = (
-													rosterDay === "day1"
-														? (g.data.playerNamesByDay?.day1 ?? legacy)
-														: (g.data.playerNamesByDay?.day2 ?? legacy)
-												).filter(Boolean);
-												return gPlayers.map((player) => {
-													const key = editKey(g.id, player);
-													const edit = playerEdits[key];
-													const handicap = edit?.handicap ?? String(g.data.handicaps?.[player] ?? 0);
-													const day2Adj = edit?.day2Adj ?? String(g.data.day2HandicapAdjustments?.[player] ?? 0);
-													const charity = edit?.charity ?? String(g.data.charityStrokes?.[player] ?? 0);
-																	const tree = edit?.tree ?? String(g.data.treeStrokes?.[player] ?? 0);
-													const teeDay1 = edit?.teeDay1 ?? ((g.data.teeChoices?.day1?.[player] as TeeKey | null | undefined) ?? "combo");
-													const teeDay2 = edit?.teeDay2 ?? ((g.data.teeChoices?.day2?.[player] as TeeKey | null | undefined) ?? "stampede");
-													const isRowSaving = savingPlayerKey === key;
-													return (
-															<tr key={key} className="border-t border-sky-100">
-															<td className="p-2 min-w-[220px]">
-																<input
-																	value={edit?.name ?? player}
+										{allPlayersRoster.map(({ player, day1Gid, day2Gid, primaryGroup: g }) => {
+												const key = editKey(player);
+												const edit = playerEdits[key];
+												const handicap = edit?.handicap ?? String(g.data.handicaps?.[player] ?? 0);
+												const day2Adj = edit?.day2Adj ?? String(g.data.day2HandicapAdjustments?.[player] ?? 0);
+												const charity = edit?.charity ?? String(g.data.charityStrokes?.[player] ?? 0);
+												const tree = edit?.tree ?? String(g.data.treeStrokes?.[player] ?? 0);
+												const teeDay1 = edit?.teeDay1 ?? ((g.data.teeChoices?.day1?.[player] as TeeKey | null | undefined) ?? "combo");
+												const teeDay2 = edit?.teeDay2 ?? ((g.data.teeChoices?.day2?.[player] as TeeKey | null | undefined) ?? "stampede");
+												const selectedDay1Gid = edit?.moveToGidDay1 !== undefined ? edit.moveToGidDay1 : (day1Gid ?? "");
+												const selectedDay2Gid = edit?.moveToGidDay2 !== undefined ? edit.moveToGidDay2 : (day2Gid ?? "");
+												const isRowSaving = savingPlayerKey === key;
+												return (
+													<tr key={key} className="border-t border-sky-100">
+													<td className="p-2 min-w-[220px]">
+														<input
+															value={edit?.name ?? player}
+															onChange={(e) =>
+																setPlayerEdits((prev) => ({
+																	...prev,
+																	[key]: { ...(prev[key] ?? {}), name: e.target.value },
+																}))
+															}
+																className="w-[20ch] max-w-[20ch] p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
+															placeholder="Player"
+														/>
+													</td>
+													<td className="p-2">
+														<select
+															value={selectedDay1Gid}
+															onChange={(e) =>
+																setPlayerEdits((prev) => ({
+																	...prev,
+																	[key]: { ...(prev[key] ?? {}), moveToGidDay1: e.target.value },
+																}))
+															}
+															className="w-16 p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
+														>
+															<option value="">—</option>
+															{foursomeOptions.map((opt) => (
+																<option key={opt.gid} value={opt.gid}>{opt.n}</option>
+															))}
+														</select>
+													</td>
+													<td className="p-2">
+														<select
+															value={selectedDay2Gid}
+															onChange={(e) =>
+																setPlayerEdits((prev) => ({
+																	...prev,
+																	[key]: { ...(prev[key] ?? {}), moveToGidDay2: e.target.value },
+																}))
+															}
+															className="w-16 p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
+														>
+															<option value="">—</option>
+															{foursomeOptions.map((opt) => (
+																<option key={opt.gid} value={opt.gid}>{opt.n}</option>
+															))}
+														</select>
+													</td>
+													<td className="p-2">
+														<input
+															value={handicap}
+															onChange={(e) =>
+																setPlayerEdits((prev) => ({
+																	...prev,
+																	[key]: { ...(prev[key] ?? {}), handicap: e.target.value },
+																}))
+														}
+															inputMode="numeric"
+																className="w-16 p-2 bg-white border border-sky-200 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-sky-200"
+														/>
+													</td>
+													<td className="p-2">
+														<input
+															value={day2Adj}
+															onChange={(e) =>
+																setPlayerEdits((prev) => ({
+																	...prev,
+																	[key]: { ...(prev[key] ?? {}), day2Adj: e.target.value },
+																}))
+														}
+															inputMode="numeric"
+																className="w-16 p-2 bg-white border border-sky-200 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-sky-200"
+														/>
+													</td>
+													<td className="p-2">
+														<select
+															value={teeDay1}
+															onChange={(e) =>
+																setPlayerEdits((prev) => ({
+																	...prev,
+																	[key]: { ...(prev[key] ?? {}), teeDay1: e.target.value as TeeKey },
+																}))
+														}
+																className="p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
+														>
+																			<option value="combo">2 Trees</option>
+															<option value="three">3 Trees (+1)</option>
+															<option value="four">4 Trees (+2)</option>
+														</select>
+													</td>
+													<td className="p-2">
+														<select
+															value={teeDay2}
+															onChange={(e) =>
+																setPlayerEdits((prev) => ({
+																	...prev,
+																	[key]: { ...(prev[key] ?? {}), teeDay2: e.target.value as TeeKey },
+																}))
+														}
+																className="p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
+														>
+															<option value="stampede">Stampede</option>
+															<option value="tips">Tips</option>
+														</select>
+													</td>
+													<td className="p-2">
+														<input
+															value={charity}
+															onChange={(e) =>
+																setPlayerEdits((prev) => ({
+																	...prev,
+																	[key]: { ...(prev[key] ?? {}), charity: e.target.value },
+																}))
+														}
+															inputMode="numeric"
+																className="w-16 p-2 bg-white border border-sky-200 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-sky-200"
+														/>
+													</td>
+																<td className="p-2">
+																	<input
+																	value={tree}
 																	onChange={(e) =>
-																		setPlayerEdits((prev) => ({
-																			...prev,
-																			[key]: { ...(prev[key] ?? {}), name: e.target.value },
-																		}))
-																	}
-																		className="w-[20ch] max-w-[20ch] p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
-																	placeholder="Player"
-																/>
-															</td>
-																		<td className="p-2 pr-1">
-																	<select
-																		value={edit?.moveToGid ?? g.id}
-																		onChange={(e) =>
-																			setPlayerEdits((prev) => ({
-																				...prev,
-																				[key]: { ...(prev[key] ?? {}), moveToGid: e.target.value },
-																			}))
-																		}
-																		className="w-16 p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
-																	>
-																		{foursomeOptions.map((opt) => (
-																			<option key={opt.gid} value={opt.gid}>
-																				{opt.n}
-																			</option>
-																		))}
-																	</select>
-																</td>
-																		<td className="p-2 pl-1 text-slate-700">{gPin || "-"}</td>
-															<td className="p-2">
-																<input
-																	value={handicap}
-																	onChange={(e) =>
-																		setPlayerEdits((prev) => ({
-																			...prev,
-																			[key]: { ...(prev[key] ?? {}), handicap: e.target.value },
-																		}))
+																	setPlayerEdits((prev) => ({
+																		...prev,
+																		[key]: { ...(prev[key] ?? {}), tree: e.target.value },
+																	}))
 																}
 																	inputMode="numeric"
 																		className="w-16 p-2 bg-white border border-sky-200 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-sky-200"
-																/>
-															</td>
-															<td className="p-2">
-																<input
-																	value={day2Adj}
-																	onChange={(e) =>
-																		setPlayerEdits((prev) => ({
-																			...prev,
-																			[key]: { ...(prev[key] ?? {}), day2Adj: e.target.value },
-																		}))
-																}
-																	inputMode="numeric"
-																		className="w-16 p-2 bg-white border border-sky-200 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-sky-200"
-																/>
-															</td>
-															<td className="p-2">
-																<select
-																	value={teeDay1}
-																	onChange={(e) =>
-																		setPlayerEdits((prev) => ({
-																			...prev,
-																			[key]: { ...(prev[key] ?? {}), teeDay1: e.target.value as TeeKey },
-																		}))
-																}
-																		className="p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
-																>
-																				<option value="combo">2 Trees</option>
-																	<option value="three">3 Trees (+1)</option>
-																	<option value="four">4 Trees (+2)</option>
-																</select>
-															</td>
-															<td className="p-2">
-																<select
-																	value={teeDay2}
-																	onChange={(e) =>
-																		setPlayerEdits((prev) => ({
-																			...prev,
-																			[key]: { ...(prev[key] ?? {}), teeDay2: e.target.value as TeeKey },
-																		}))
-																}
-																		className="p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
-																>
-																	<option value="stampede">Stampede</option>
-																	<option value="tips">Tips</option>
-																</select>
-															</td>
-															<td className="p-2">
-																<input
-																	value={charity}
-																	onChange={(e) =>
-																		setPlayerEdits((prev) => ({
-																			...prev,
-																			[key]: { ...(prev[key] ?? {}), charity: e.target.value },
-																		}))
-																}
-																	inputMode="numeric"
-																		className="w-16 p-2 bg-white border border-sky-200 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-sky-200"
-																/>
-															</td>
-																		<td className="p-2">
-																			<input
-																			value={tree}
-																			onChange={(e) =>
-																			setPlayerEdits((prev) => ({
-																				...prev,
-																				[key]: { ...(prev[key] ?? {}), tree: e.target.value },
-																			}))
-																		}
-																		inputMode="numeric"
-																			className="w-16 p-2 bg-white border border-sky-200 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-sky-200"
-																		/>
-																		</td>
-															<td className="p-2 whitespace-nowrap">
-																<div className="flex gap-2">
-																	<button
-																		onClick={() => router.push(`/group/${g.id}/admin`)}
-																			className="bg-white hover:bg-sky-50 border border-sky-200 px-3 py-2 rounded-lg text-sm"
-																	>
-																		Open
-																	</button>
-																	<button
-																		onClick={() => deletePlayerFromGroup({ gid: g.id, player })}
-																			className="bg-white hover:bg-sky-50 border border-sky-200 px-3 py-2 rounded-lg text-sm"
-																	>
-																		Delete
-																	</button>
-																	<button
-																		onClick={() => savePlayerEdits({ gid: g.id, player, day: rosterDay })}
-																		disabled={isRowSaving}
-																			className="bg-sky-600 hover:bg-sky-500 disabled:opacity-60 px-3 py-2 rounded-lg font-semibold text-white"
-																	>
-																		{isRowSaving ? "Saving…" : "Save"}
-																	</button>
-																</div>
-															</td>
-														</tr>
-													);
-												});
+																	/>
+																	</td>
+													<td className="p-2 whitespace-nowrap">
+														<div className="flex gap-2">
+															<button
+																onClick={() => router.push(`/group/${g.id}/admin`)}
+																	className="bg-white hover:bg-sky-50 border border-sky-200 px-3 py-2 rounded-lg text-sm"
+															>
+																Open
+															</button>
+															<button
+																onClick={() => deletePlayerGlobally(player, day1Gid, day2Gid)}
+																	className="bg-white hover:bg-sky-50 border border-sky-200 px-3 py-2 rounded-lg text-sm"
+															>
+																Delete
+															</button>
+															<button
+																onClick={() => savePlayerEdits({ player, currentDay1Gid: day1Gid, currentDay2Gid: day2Gid })}
+																disabled={isRowSaving}
+																	className="bg-sky-600 hover:bg-sky-500 disabled:opacity-60 px-3 py-2 rounded-lg font-semibold text-white"
+															>
+																{isRowSaving ? "Saving…" : "Save"}
+															</button>
+														</div>
+													</td>
+												</tr>
+												);
 											})
 											}
 									</tbody>
@@ -1296,67 +1161,21 @@ export default function GroupAdminPage() {
 
 							<div className="mt-4 border-t border-sky-200 pt-4">
 								<h3 className="text-sm font-semibold text-slate-900">Add player</h3>
-								<div className="mt-3 grid grid-cols-1 lg:grid-cols-6 gap-2">
+								<p className="text-xs text-slate-600 mt-1">Player is added to the current foursome. Assign Day 1 / Day 2 groups above after adding.</p>
+								<div className="mt-3 flex flex-wrap gap-2 items-center">
 									<input
 										value={addPlayerName}
 										onChange={(e) => setAddPlayerName(e.target.value)}
-										className="p-2 bg-white border border-sky-200 rounded-lg lg:col-span-2 w-[20ch] max-w-full focus:outline-none focus:ring-2 focus:ring-sky-200"
+										className="p-2 bg-white border border-sky-200 rounded-lg w-48 focus:outline-none focus:ring-2 focus:ring-sky-200"
 										placeholder="Player name"
-									/>
-									<input
-										value={addPlayerFoursome}
-										onChange={(e) => setAddPlayerFoursome(e.target.value)}
-										inputMode="numeric"
-										className="p-2 bg-white border border-sky-200 rounded-lg w-16 focus:outline-none focus:ring-2 focus:ring-sky-200"
-										placeholder="Foursome #"
 									/>
 									<input
 										value={addPlayerHandicap}
 										onChange={(e) => setAddPlayerHandicap(e.target.value)}
 										inputMode="numeric"
-										className="p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
-										placeholder="Hndcp"
+										className="p-2 bg-white border border-sky-200 rounded-lg w-24 focus:outline-none focus:ring-2 focus:ring-sky-200"
+										placeholder="Handicap"
 									/>
-									<input
-										value={addPlayerDay2Adj}
-										onChange={(e) => setAddPlayerDay2Adj(e.target.value)}
-										inputMode="numeric"
-										className="p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
-										placeholder="D2 Adj"
-									/>
-									<select
-										value={addPlayerTeeDay1}
-										onChange={(e) => setAddPlayerTeeDay1(e.target.value as TeeKey)}
-										className="p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
-									>
-										<option value="combo">Day 1: 2 Trees</option>
-										<option value="three">Day 1: 3 Trees</option>
-										<option value="four">Day 1: 4 Trees</option>
-									</select>
-									<select
-										value={addPlayerTeeDay2}
-										onChange={(e) => setAddPlayerTeeDay2(e.target.value as TeeKey)}
-										className="p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
-									>
-										<option value="stampede">Day 2: Stampede</option>
-										<option value="tips">Day 2: Tips</option>
-									</select>
-									<input
-										value={addPlayerCharity}
-										onChange={(e) => setAddPlayerCharity(e.target.value)}
-										inputMode="numeric"
-										className="p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
-										placeholder="Char"
-									/>
-									<input
-										value={addPlayerTree}
-										onChange={(e) => setAddPlayerTree(e.target.value)}
-										inputMode="numeric"
-										className="p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
-										placeholder="Tree"
-									/>
-								</div>
-								<div className="mt-3 flex items-center gap-3">
 									<button
 										onClick={addPlayerToFoursome}
 										disabled={addingPlayer}
@@ -1369,54 +1188,6 @@ export default function GroupAdminPage() {
 							</div>
 						</div>
 
-							<div className="mt-6 bg-white/80 border border-sky-200 rounded-2xl p-5">
-								<h2 className="text-lg font-semibold">Create a new foursome</h2>
-								<p className="text-slate-600 text-sm mt-1">Creates a new group (separate doc) so you don’t overwrite this one.</p>
-								<div className="mt-3 grid grid-cols-1 gap-2">
-									<input
-										value={newFoursomeNumberDraft}
-										onChange={(e) => setNewFoursomeNumberDraft(e.target.value)}
-										inputMode="numeric"
-										className="p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
-										placeholder="Foursome # (e.g. 2)"
-									/>
-									<input
-										value={newPinDraft}
-										onChange={(e) => setNewPinDraft(e.target.value)}
-										className="p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
-										placeholder="PIN (required)"
-									/>
-									<textarea
-										value={newPlayersDraft}
-										onChange={(e) => setNewPlayersDraft(e.target.value)}
-										rows={3}
-										className="p-3 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
-										placeholder="Players (comma or newline separated)"
-									/>
-									<div className="flex flex-wrap gap-2">
-										<button
-											onClick={() => createNewGroup(false)}
-											disabled={creatingGroup}
-											className="bg-sky-600 hover:bg-sky-500 disabled:opacity-60 px-4 py-2 rounded-lg font-semibold text-white"
-										>
-											{creatingGroup ? "Creating…" : "Create group"}
-										</button>
-										<button
-											onClick={() => createNewGroup(true)}
-											disabled={creatingGroup}
-											className="bg-white hover:bg-sky-50 border border-sky-200 disabled:opacity-60 px-4 py-2 rounded-lg text-sm"
-										>
-											Create & open admin
-										</button>
-									</div>
-									{createGroupError ? <p className="text-sm text-red-600 mt-2">{createGroupError}</p> : null}
-									{createdGroupId ? (
-										<p className="text-sm text-sky-700 mt-2">
-											Created: <a className="underline" href={`/group/${createdGroupId}`}>/group/{createdGroupId}</a>
-										</p>
-									) : null}
-								</div>
-							</div>
 
 							<div className="mt-6 bg-white/80 border border-sky-200 rounded-2xl p-5">
 							<h2 className="text-lg font-semibold">Course scorecards (Pars)</h2>

@@ -101,12 +101,23 @@ export default function Home() {
             <h1 className="text-2xl font-bold">Cal-Pac 2026</h1>
             <p className="text-slate-500 text-sm mt-0.5">Select your name to start scoring</p>
           </div>
-          <button
-            onClick={() => router.push("/leaderboard")}
-            className="bg-white border border-sky-200 rounded-xl px-3 py-2 text-sm font-semibold text-sky-700 hover:bg-sky-50 transition-colors shrink-0"
-          >
-            🏆 Leaderboard
-          </button>
+          <div className="flex gap-2 shrink-0">
+            <button
+              onClick={() => router.push("/leaderboard")}
+              className="bg-white border border-sky-200 rounded-xl px-3 py-2 text-sm font-semibold text-sky-700 hover:bg-sky-50 transition-colors"
+            >
+              🏆 Leaderboard
+            </button>
+            <button
+              onClick={() => {
+                const gid = players.find((p) => p.day1GroupId)?.day1GroupId ?? "";
+                router.push(`/group/${gid}/admin`);
+              }}
+              className="bg-white border border-sky-200 rounded-xl px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-sky-50 transition-colors"
+            >
+              ⚙️ Admin
+            </button>
+          </div>
         </div>
 
         <input
