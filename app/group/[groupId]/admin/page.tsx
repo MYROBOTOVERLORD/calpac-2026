@@ -350,9 +350,13 @@ export default function GroupAdminPage() {
 	}
 
 	const foursomeOptions = useMemo(() => {
-		const opts = allGroups
-			.map((g) => ({ gid: g.id, n: getFoursomeNumber(g.data) }))
-			.filter((x) => typeof x.n === "number" && Number.isFinite(x.n as number)) as Array<{ gid: string; n: number }>;
+		const seen = new Map<number, string>();
+		for (const g of allGroups) {
+			const n = getFoursomeNumber(g.data);
+			if (n == null) continue;
+			if (!seen.has(n)) seen.set(n, g.id);
+		}
+		const opts = Array.from(seen.entries()).map(([n, gid]) => ({ gid, n }));
 		opts.sort((a, b) => a.n - b.n);
 		return opts;
 	}, [allGroups]);
