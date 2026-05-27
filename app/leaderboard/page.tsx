@@ -122,6 +122,8 @@ function computeLeaderboard(groups: GroupDoc[], day: DayKey): PlayerRow[] {
   rows.sort((a, b) => {
     if (a.holesPlayed === 0 && b.holesPlayed > 0) return 1;
     if (b.holesPlayed === 0 && a.holesPlayed > 0) return -1;
+    // Sort by toPar first (null = no pars configured, fall back to net)
+    if (a.toPar !== null && b.toPar !== null) return a.toPar - b.toPar || a.net - b.net || a.gross - b.gross;
     return a.net - b.net || a.gross - b.gross;
   });
   return rows;
