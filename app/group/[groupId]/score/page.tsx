@@ -430,6 +430,7 @@ export default function ScoringPage() {
   const runningTotals = useMemo(() => {
     const t: Record<string, number> = {};
     for (const p of players) {
+      // Only sum holes that have an actual score entered (not null)
       t[p] = (scores[p] ?? []).slice(0, currentHole + 1).reduce<number>((a, v) => (typeof v === "number" ? a + v : a), 0);
     }
     return t;
@@ -792,17 +793,30 @@ export default function ScoringPage() {
               const holeStrokes = strokesForHole(hcpIdx, hdcp + adj + teeBonus);
               const netHole = gross !== null ? gross - holeStrokes : null;
               const rt = runningTotals[player] ?? 0;
-              const diff = rt - parThrough;
+              const playerScores = (scores[player] ?? []).slice(0, currentHole + 1);
+              const holesPlayed = playerScores.filter((v) => typeof v === "number").length;
+              const parForScoredHoles = playerScores.reduce<number>((a, v, i) => {
+                if (typeof v !== "number") return a;
+                const p = dayPars ? dayPars[i] : course.holes[i]?.par ?? 0;
+                return a + p;
+              }, 0);
+              const diff = rt - parForScoredHoles;
 
               return (
                 <div key={player} className="flex items-center gap-4 bg-zinc-900 rounded-2xl px-4 py-3">
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-white truncate">{player}</p>
                     <p className="text-xs text-zinc-500 mt-0.5">
-                      Thru {currentHole + 1} ·{" "}
-                      <span className={diff < 0 ? "text-red-400" : diff === 0 ? "text-emerald-400" : "text-zinc-400"}>
-                        {diff === 0 ? "E" : diff > 0 ? `+${diff}` : diff}
-                      </span>
+                      {holesPlayed > 0 ? (
+                        <>
+                          Thru {holesPlayed} ·{" "}
+                          <span className={diff < 0 ? "text-red-400" : diff === 0 ? "text-emerald-400" : "text-zinc-400"}>
+                            {diff === 0 ? "E" : diff > 0 ? `+${diff}` : diff}
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-zinc-600">No scores yet</span>
+                      )}
                     </p>
                   </div>
                   <div className="text-right">
