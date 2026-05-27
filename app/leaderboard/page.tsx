@@ -78,7 +78,7 @@ function applyCharity(net: number, scores: Array<number | null>, charity: number
 }
 
 function teeBonusForDay(day: DayKey, tee?: string | null): number {
-  return day === "day1" && tee === "three" ? 1 : day === "day1" && tee === "four" ? 2 : 0;
+  return day === "day1" && tee === "three" ? 1 : 0;
 }
 
 function fmtToPar(v: number | null): string {

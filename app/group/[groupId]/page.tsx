@@ -147,7 +147,6 @@ function coerceTeeMap(players: string[], input?: Record<string, TeeKey | null> |
 function teeBonusForDay(day: DayKey, tee: TeeKey | null | undefined) {
 	if (day === "day1") {
 		if (tee === "three") return 1;
-		if (tee === "four") return 2;
 		return 0;
 	}
 	// Day 2: Stampede/Tips (no bonus unless rules change)

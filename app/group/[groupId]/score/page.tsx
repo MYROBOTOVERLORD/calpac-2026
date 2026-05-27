@@ -96,7 +96,7 @@ function coerceTeeMap(players: string[], input?: Record<string, TeeKey | null> |
 }
 
 function teeBonusForDay(day: DayKey, tee?: TeeKey | null): number {
-  return day === "day1" && tee === "three" ? 1 : day === "day1" && tee === "four" ? 2 : 0;
+  return day === "day1" && tee === "three" ? 1 : 0;
 }
 
 function arrSum(arr: Array<number | null>): number {
