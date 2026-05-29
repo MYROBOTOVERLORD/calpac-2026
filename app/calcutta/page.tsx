@@ -138,84 +138,65 @@ export default function CalcuttaPage() {
 		return out;
 	}, [teams]);
 
-	if (loading) return <main className="min-h-screen bg-sky-50 text-slate-900 p-3 sm:p-6">Loading…</main>;
-	if (error) return <main className="min-h-screen bg-sky-50 text-slate-900 p-3 sm:p-6">{error}</main>;
+	if (loading) return <main className="min-h-screen bg-zinc-950 text-white p-3 sm:p-6 flex items-center justify-center"><div className="text-zinc-400 text-sm">Loading…</div></main>;
+	if (error) return <main className="min-h-screen bg-zinc-950 text-white p-3 sm:p-6 flex items-center justify-center"><div className="text-red-400 text-sm">{error}</div></main>;
 
 	return (
-		<main className="min-h-screen bg-sky-50 text-slate-900 p-3 sm:p-6">
-			<div className="max-w-5xl mx-auto">
-				<div className="flex items-start justify-between gap-3 flex-wrap">
+		<main className="min-h-screen bg-zinc-950 text-white p-4 sm:p-6">
+			<div className="max-w-lg mx-auto">
+				{/* Header */}
+				<div className="flex items-start justify-between gap-3 mb-6">
 					<div>
-						<h1 className="text-2xl font-bold">Calcutta</h1>
-						<p className="text-slate-600 text-sm mt-1">
-							{event?.course ? `${event.course} · ` : ""}2-player team event
-						</p>
+						<h1 className="text-2xl font-bold">🤑 Calcutta</h1>
+						<p className="text-zinc-500 text-sm mt-0.5">Select your team to score</p>
 					</div>
-					<div className="flex gap-2">
-						<button
-							onClick={() => router.push("/calcutta/admin")}
-							className="bg-sky-600 hover:bg-sky-500 px-4 py-2 rounded-lg font-semibold text-white"
-						>
-							Admin
-						</button>
-					</div>
+					<button
+						onClick={() => router.push("/calcutta/admin")}
+						className="bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 px-3 py-2 rounded-xl text-sm font-semibold text-zinc-400 transition-colors"
+					>
+						⚙️ Admin
+					</button>
 				</div>
 
-				{event ? null : (
-					<div className="mt-4 bg-white/80 border border-sky-200 rounded-2xl p-4">
-						<p className="text-slate-700 text-sm">
-							Calcutta event not set up yet. An admin can create it from the Admin page.
-						</p>
+				{!event && (
+					<div className="mb-4 bg-zinc-900 border border-zinc-700 rounded-2xl p-4">
+						<p className="text-zinc-400 text-sm">Calcutta event not set up yet. An admin can create it from the Admin page.</p>
 					</div>
 				)}
 
-				<div className="mt-4 sm:mt-6 bg-white/80 border border-sky-200 rounded-2xl p-3 sm:p-5">
-					<div className="flex items-center justify-between gap-3 flex-wrap">
-						<h2 className="text-lg font-semibold">Leaderboard</h2>
-						<p className="text-sm text-slate-600">Sorted by team net (low)</p>
+				{/* Team list — tap to score */}
+				{rows.length > 0 ? (
+					<div className="space-y-2 mb-6">
+						{rows.map((r, idx) => (
+							<button
+								key={r.id}
+								onClick={() => router.push(`/calcutta/score/${r.id}`)}
+								className="w-full bg-zinc-900 border border-zinc-800 hover:border-emerald-700 hover:bg-zinc-800 rounded-2xl px-4 py-4 text-left transition-colors active:scale-[0.99]"
+							>
+								<div className="flex items-center gap-3">
+									<span className={`text-sm font-bold w-5 shrink-0 ${idx === 0 ? "text-emerald-400" : "text-zinc-600"}`}>{idx + 1}</span>
+									<div className="flex-1 min-w-0">
+										<p className="font-semibold text-white">{r.teamName}</p>
+										<p className="text-xs text-zinc-500 mt-0.5">{r.playerA} ({r.handicapA}) · {r.playerB} ({r.handicapB}) · HCP {r.teamHandicap}</p>
+									</div>
+									<div className="text-right shrink-0">
+										<p className="text-xs text-zinc-600">Net</p>
+										<p className="text-base font-bold text-emerald-400">{r.teamNet == null ? "—" : r.teamNet}</p>
+									</div>
+									<span className="text-zinc-600 ml-1">→</span>
+								</div>
+							</button>
+						))}
 					</div>
-
-					<div className="mt-3 overflow-x-auto bg-white border border-sky-200 rounded-xl p-2 sm:p-3">
-						<table className="w-full min-w-[640px] text-sm">
-							<thead>
-								<tr className="text-left text-slate-700">
-									<th className="p-2">#</th>
-									<th className="p-2">Team</th>
-									<th className="p-2">Players</th>
-									<th className="p-2">Team HCP</th>
-									<th className="p-2">Gross</th>
-									<th className="p-2">Net</th>
-								</tr>
-							</thead>
-							<tbody>
-								{rows.length ? (
-									rows.map((r, idx) => (
-										<tr key={r.id} className="border-t border-sky-100">
-											<td className="p-2 text-slate-500">{idx + 1}</td>
-											<td className="p-2 text-slate-900 font-semibold whitespace-nowrap">{r.teamName}</td>
-											<td className="p-2 text-slate-800 whitespace-nowrap">
-												{r.playerA} ({r.handicapA}) · {r.playerB} ({r.handicapB})
-											</td>
-											<td className="p-2 text-slate-800">{r.teamHandicap}</td>
-											<td className="p-2 text-slate-800">{r.teamGross == null ? "—" : r.teamGross}</td>
-											<td className="p-2 text-slate-800 font-semibold">{r.teamNet == null ? "—" : r.teamNet}</td>
-										</tr>
-									))
-								) : (
-									<tr>
-										<td className="p-3 text-slate-600" colSpan={6}>
-											No teams yet.
-										</td>
-									</tr>
-								)}
-							</tbody>
-						</table>
+				) : (
+					<div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 text-center mb-6">
+						<p className="text-zinc-500 text-sm">No teams yet. An admin can add teams from the Admin page.</p>
 					</div>
-				</div>
+				)}
 
-				<div className="mt-4 text-xs text-slate-500">
-					Best ball: enter one score per hole (team score). Totals show after all 18 holes are entered. Team Net = Team Gross − (HCP A + HCP B).
-				</div>
+				<p className="text-xs text-zinc-600 text-center">
+					Team Net = Gross − (HCP A + HCP B). Sorted by net score.
+				</p>
 			</div>
 		</main>
 	);
