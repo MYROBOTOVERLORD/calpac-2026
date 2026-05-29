@@ -150,12 +150,20 @@ export default function CalcuttaPage() {
 						<h1 className="text-2xl font-bold">🤑 Calcutta</h1>
 						<p className="text-zinc-500 text-sm mt-0.5">Select your team to score</p>
 					</div>
-					<button
-						onClick={() => router.push("/calcutta/admin")}
-						className="bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 px-3 py-2 rounded-xl text-sm font-semibold text-zinc-400 transition-colors"
-					>
-						⚙️ Admin
-					</button>
+					<div className="flex gap-2">
+						<button
+							onClick={() => router.push("/calcutta/leaderboard")}
+							className="bg-emerald-900 hover:bg-emerald-800 border border-emerald-700 px-3 py-2 rounded-xl text-sm font-semibold text-emerald-300 transition-colors"
+						>
+							🏆 Board
+						</button>
+						<button
+							onClick={() => router.push("/calcutta/admin")}
+							className="bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 px-3 py-2 rounded-xl text-sm font-semibold text-zinc-400 transition-colors"
+						>
+							⚙️ Admin
+						</button>
+					</div>
 				</div>
 
 				{!event && (
