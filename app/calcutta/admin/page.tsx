@@ -14,6 +14,7 @@ import {
 } from "firebase/firestore";
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut, type User } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
+import { COURSES } from "@/lib/courses";
 
 type CalcuttaEventDoc = {
 	name?: string;
@@ -102,7 +103,7 @@ export default function CalcuttaAdminPage() {
 	const [teams, setTeams] = useState<Array<{ id: string; data: CalcuttaTeamDoc }>>([]);
 
 	const [eventNameDraft, setEventNameDraft] = useState("Calcutta");
-	const [courseDraft, setCourseDraft] = useState("");
+	const [courseDraft, setCourseDraft] = useState("hills");
 	const [eventSaveError, setEventSaveError] = useState<string | null>(null);
 	const [eventSaving, setEventSaving] = useState(false);
 
@@ -374,12 +375,15 @@ export default function CalcuttaAdminPage() {
 							className="p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
 							placeholder="Event name"
 						/>
-						<input
-							value={courseDraft}
-							onChange={(e) => setCourseDraft(e.target.value)}
-							className="p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
-							placeholder="Course (optional)"
-						/>
+					<select
+						value={courseDraft}
+						onChange={(e) => setCourseDraft(e.target.value)}
+						className="p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
+					>
+						{Object.values(COURSES).map((c) => (
+							<option key={c.id} value={c.id}>{c.name}</option>
+						))}
+					</select>
 					</div>
 
 					{eventSaveError ? <p className="text-sm text-red-600 mt-2">{eventSaveError}</p> : null}

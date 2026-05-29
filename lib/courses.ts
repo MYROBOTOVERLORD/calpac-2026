@@ -278,9 +278,127 @@ export const GRAYS_CROSSING: CourseData = {
   ],
 };
 
+export const HILLS: CourseData = {
+  id: "hills",
+  name: "Hills at Resort at Red Hawk",
+  shortName: "RH",
+  par: 71,
+  holes: [
+    {
+      hole: 1, par: 5, handicap: 7,
+      tees: [{ name: "Blue", yardage: 490 }],
+      imageUrl: "/greens/rh/prev_yardage.png",
+      greenImageUrl: "/greens/rh/scan_p0.png",
+    },
+    {
+      hole: 2, par: 4, handicap: 3,
+      tees: [{ name: "Blue", yardage: 355 }],
+      imageUrl: "/greens/rh/prev_yardage.png",
+      greenImageUrl: "/greens/rh/scan_p0.png",
+    },
+    {
+      hole: 3, par: 4, handicap: 11,
+      tees: [{ name: "Blue", yardage: 302 }],
+      imageUrl: "/greens/rh/prev_yardage.png",
+      greenImageUrl: "/greens/rh/scan_p1.png",
+    },
+    {
+      hole: 4, par: 4, handicap: 17,
+      tees: [{ name: "Blue", yardage: 332 }],
+      imageUrl: "/greens/rh/prev_yardage.png",
+      greenImageUrl: "/greens/rh/scan_p1.png",
+    },
+    {
+      hole: 5, par: 3, handicap: 13,
+      tees: [{ name: "Blue", yardage: 128 }],
+      imageUrl: "/greens/rh/prev_yardage.png",
+      greenImageUrl: "/greens/rh/scan_p2.png",
+    },
+    {
+      hole: 6, par: 4, handicap: 1,
+      tees: [{ name: "Blue", yardage: 456 }],
+      imageUrl: "/greens/rh/prev_yardage.png",
+      greenImageUrl: "/greens/rh/scan_p2.png",
+    },
+    {
+      hole: 7, par: 3, handicap: 15,
+      tees: [{ name: "Blue", yardage: 128 }],
+      imageUrl: "/greens/rh/prev_yardage.png",
+      greenImageUrl: "/greens/rh/scan_p3.png",
+    },
+    {
+      hole: 8, par: 5, handicap: 5,
+      tees: [{ name: "Blue", yardage: 481 }],
+      imageUrl: "/greens/rh/prev_yardage.png",
+      greenImageUrl: "/greens/rh/scan_p3.png",
+    },
+    {
+      hole: 9, par: 4, handicap: 9,
+      tees: [{ name: "Blue", yardage: 282 }],
+      imageUrl: "/greens/rh/prev_yardage.png",
+      greenImageUrl: "/greens/rh/scan_p4.png",
+    },
+    {
+      hole: 10, par: 5, handicap: 14,
+      tees: [{ name: "Blue", yardage: 586 }],
+      imageUrl: "/greens/rh/prev_yardage.png",
+      greenImageUrl: "/greens/rh/scan_p4.png",
+    },
+    {
+      hole: 11, par: 3, handicap: 10,
+      tees: [{ name: "Blue", yardage: 213 }],
+      imageUrl: "/greens/rh/prev_yardage.png",
+      greenImageUrl: "/greens/rh/scan_p5.png",
+    },
+    {
+      hole: 12, par: 4, handicap: 16,
+      tees: [{ name: "Blue", yardage: 386 }],
+      imageUrl: "/greens/rh/prev_yardage.png",
+      greenImageUrl: "/greens/rh/scan_p5.png",
+    },
+    {
+      hole: 13, par: 3, handicap: 18,
+      tees: [{ name: "Blue", yardage: 125 }],
+      imageUrl: "/greens/rh/prev_yardage.png",
+      greenImageUrl: "/greens/rh/scan_p6.png",
+    },
+    {
+      hole: 14, par: 4, handicap: 2,
+      tees: [{ name: "Blue", yardage: 360 }],
+      imageUrl: "/greens/rh/prev_yardage.png",
+      greenImageUrl: "/greens/rh/scan_p6.png",
+    },
+    {
+      hole: 15, par: 4, handicap: 8,
+      tees: [{ name: "Blue", yardage: 355 }],
+      imageUrl: "/greens/rh/prev_yardage.png",
+      greenImageUrl: "/greens/rh/scan_p7.png",
+    },
+    {
+      hole: 16, par: 4, handicap: 4,
+      tees: [{ name: "Blue", yardage: 440 }],
+      imageUrl: "/greens/rh/prev_yardage.png",
+      greenImageUrl: "/greens/rh/scan_p7.png",
+    },
+    {
+      hole: 17, par: 4, handicap: 12,
+      tees: [{ name: "Blue", yardage: 407 }],
+      imageUrl: "/greens/rh/prev_yardage.png",
+      greenImageUrl: "/greens/rh/scan_p8.png",
+    },
+    {
+      hole: 18, par: 4, handicap: 6,
+      tees: [{ name: "Blue", yardage: 418 }],
+      imageUrl: "/greens/rh/prev_yardage.png",
+      greenImageUrl: "/greens/rh/scan_p8.png",
+    },
+  ],
+};
+
 export const COURSES: Record<string, CourseData> = {
   "old-greenwood": OLD_GREENWOOD,
   "grays-crossing": GRAYS_CROSSING,
+  "hills": HILLS,
 };
 
 // Day 1 = Old Greenwood, Day 2 = Gray's Crossing
