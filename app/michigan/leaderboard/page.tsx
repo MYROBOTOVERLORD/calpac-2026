@@ -99,7 +99,8 @@ type PlayerDayRow = {
 
 type OverallRow = {
   player: string;
-  daysPlayed: number;
+  roundsComplete: number;
+  roundsInProgress: number;
   totalGross: number;
   totalNet: number;
   handicap: number;
@@ -133,7 +134,7 @@ function computeDayRows(groups: MichiganGroupDoc[], dayKey: DayKey): PlayerDayRo
 }
 
 function computeOverall(groups: MichiganGroupDoc[]): OverallRow[] {
-  const playerMap = new Map<string, { daysPlayed: number; totalGross: number; totalNet: number; handicap: number }>();
+  const playerMap = new Map<string, { roundsComplete: number; roundsInProgress: number; totalGross: number; totalNet: number; handicap: number }>();
 
   for (const g of groups) {
     const players = (g.players ?? []).filter(Boolean);
@@ -143,12 +144,15 @@ function computeOverall(groups: MichiganGroupDoc[]): OverallRow[] {
         ? (g.scores![p] as (number | null)[])
         : Array.from({ length: HOLE_COUNT }, () => null);
       const hcp = typeof g.handicaps?.[p] === "number" ? (g.handicaps![p] as number) : 0;
-      if (!isCompleteRound(s)) continue; // Only count complete rounds
+      const holesPlayed = s.filter((v) => typeof v === "number").length;
+      if (holesPlayed === 0) continue;
+      const complete = isCompleteRound(s);
       const gross = arrSum(s);
       const net = calcNet(s, hcps, hcp);
-      const existing = playerMap.get(p) ?? { daysPlayed: 0, totalGross: 0, totalNet: 0, handicap: hcp };
+      const existing = playerMap.get(p) ?? { roundsComplete: 0, roundsInProgress: 0, totalGross: 0, totalNet: 0, handicap: hcp };
       playerMap.set(p, {
-        daysPlayed: existing.daysPlayed + 1,
+        roundsComplete: existing.roundsComplete + (complete ? 1 : 0),
+        roundsInProgress: existing.roundsInProgress + (complete ? 0 : 1),
         totalGross: existing.totalGross + gross,
         totalNet: existing.totalNet + net,
         handicap: hcp,
@@ -159,8 +163,10 @@ function computeOverall(groups: MichiganGroupDoc[]): OverallRow[] {
   return [...playerMap.entries()]
     .map(([player, data]) => ({ player, ...data }))
     .sort((a, b) => {
-      if (a.daysPlayed === 0 && b.daysPlayed > 0) return 1;
-      if (b.daysPlayed === 0 && a.daysPlayed > 0) return -1;
+      const aActive = a.roundsComplete + a.roundsInProgress;
+      const bActive = b.roundsComplete + b.roundsInProgress;
+      if (aActive === 0 && bActive > 0) return 1;
+      if (bActive === 0 && aActive > 0) return -1;
       return a.totalNet - b.totalNet || a.totalGross - b.totalGross;
     });
 }
@@ -334,7 +340,7 @@ export default function MichiganLeaderboardPage() {
         )}
         {selectedDay === "overall" && (
           <p className="text-xs text-slate-500 uppercase tracking-wide font-semibold mb-3">
-            Cumulative · Net Total (complete rounds only)
+            Cumulative · Net Total · includes rounds in progress
           </p>
         )}
 
@@ -350,33 +356,41 @@ export default function MichiganLeaderboardPage() {
               <span className="text-[10px] text-slate-600 w-14 text-right shrink-0">Net</span>
             </div>
             <div className="space-y-1.5 mb-6">
-              {overallRows.map((r, i) => (
-                <div
-                  key={r.player}
-                  className={`flex items-center gap-2 rounded-xl px-3 py-3 ${
-                    i === 0 && r.daysPlayed > 0 ? "bg-blue-900/40 border border-blue-800/50" : "bg-slate-800"
-                  }`}
-                >
-                  <span className={`text-sm font-bold w-6 shrink-0 ${i === 0 && r.daysPlayed > 0 ? "text-blue-400" : "text-slate-600"}`}>
-                    {r.daysPlayed > 0 ? i + 1 : "—"}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-white truncate">{r.player}</p>
-                    <p className="text-[11px] text-slate-500">Hcp {r.handicap}</p>
+              {overallRows.map((r, i) => {
+                const active = r.roundsComplete + r.roundsInProgress;
+                const inProg = r.roundsInProgress > 0;
+                return (
+                  <div
+                    key={r.player}
+                    className={`flex items-center gap-2 rounded-xl px-3 py-3 ${
+                      i === 0 && active > 0 ? "bg-blue-900/40 border border-blue-800/50" : "bg-slate-800"
+                    }`}
+                  >
+                    <span className={`text-sm font-bold w-6 shrink-0 ${i === 0 && active > 0 ? "text-blue-400" : "text-slate-600"}`}>
+                      {active > 0 ? i + 1 : "—"}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-white truncate">{r.player}</p>
+                      <p className="text-[11px] text-slate-500">
+                        Hcp {r.handicap}{inProg ? ` · ${r.roundsInProgress} in progress` : ""}
+                      </p>
+                    </div>
+                    <span className="text-xs text-slate-500 w-14 text-right shrink-0">
+                      {active > 0
+                        ? `${r.roundsComplete}/6${inProg ? ` +${r.roundsInProgress}▶` : ""}`
+                        : "—"}
+                    </span>
+                    <span className="text-sm font-bold text-slate-400 w-14 text-right shrink-0">
+                      {active > 0 ? r.totalGross : "—"}
+                    </span>
+                    <span className={`text-sm font-bold w-14 text-right shrink-0 ${active > 0 ? "text-white" : "text-slate-600"}`}>
+                      {active > 0 ? r.totalNet : "—"}
+                    </span>
                   </div>
-                  <span className="text-xs text-slate-500 w-14 text-right shrink-0">
-                    {r.daysPlayed > 0 ? `${r.daysPlayed}/5` : "—"}
-                  </span>
-                  <span className="text-sm font-bold text-slate-400 w-14 text-right shrink-0">
-                    {r.daysPlayed > 0 ? r.totalGross : "—"}
-                  </span>
-                  <span className={`text-sm font-bold w-14 text-right shrink-0 ${r.daysPlayed > 0 ? "text-white" : "text-slate-600"}`}>
-                    {r.daysPlayed > 0 ? r.totalNet : "—"}
-                  </span>
-                </div>
-              ))}
+                );
+              })}
               {overallRows.length === 0 && (
-                <p className="text-center text-slate-600 text-sm mt-6">No complete rounds yet.</p>
+                <p className="text-center text-slate-600 text-sm mt-6">No scores recorded yet.</p>
               )}
             </div>
 

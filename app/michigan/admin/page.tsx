@@ -184,6 +184,12 @@ export default function MichiganAdminPage() {
   const [scorecardSaving, setScorecardSaving] = useState<string | null>(null);
   const [scorecardError, setScorecardError] = useState<string | null>(null);
 
+  // Roster editor
+  const [rosterEditing, setRosterEditing] = useState<string | null>(null);
+  const [rosterDraft, setRosterDraft] = useState<Record<string, string[]>>({});
+  const [rosterSaving, setRosterSaving] = useState<string | null>(null);
+  const [rosterError, setRosterError] = useState<string | null>(null);
+
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => setAdminUser(u));
     return () => unsub();
@@ -331,6 +337,53 @@ export default function MichiganAdminPage() {
     }
   }
 
+  async function saveRoster(groupId: string) {
+    const newPlayers = rosterDraft[groupId];
+    if (!newPlayers || newPlayers.some((p) => !p)) {
+      setRosterError("All player slots must be filled.");
+      return;
+    }
+    if (new Set(newPlayers).size !== newPlayers.length) {
+      setRosterError("Each player can only appear once in a group.");
+      return;
+    }
+    // Check for overlap with sibling groups on the same day
+    const g = groups.find((x) => x.id === groupId);
+    if (g) {
+      const siblings = groups.filter((x) => x.day === g.day && x.id !== groupId);
+      const siblingPlayers = siblings.flatMap((s) => s.players ?? []);
+      const conflict = newPlayers.find((p) => siblingPlayers.includes(p));
+      if (conflict) {
+        setRosterError(`${conflict} is already in another group for this round.`);
+        return;
+      }
+    }
+    setRosterSaving(groupId);
+    setRosterError(null);
+    const existing = groups.find((x) => x.id === groupId);
+    const newScores: Record<string, (number | null)[]> = {};
+    const newHandicaps: Record<string, number | null> = {};
+    for (const p of newPlayers) {
+      newScores[p] = Array.isArray(existing?.scores?.[p])
+        ? (existing!.scores![p] as (number | null)[])
+        : Array.from({ length: HOLE_COUNT }, () => null);
+      newHandicaps[p] = typeof existing?.handicaps?.[p] === "number" ? existing!.handicaps![p] : null;
+    }
+    try {
+      await updateDoc(doc(db, "michigan", groupId), {
+        players: newPlayers,
+        scores: newScores,
+        handicaps: newHandicaps,
+        updatedAt: serverTimestamp(),
+      });
+      setRosterEditing(null);
+    } catch (err) {
+      setRosterError(err instanceof Error ? err.message : "Save failed.");
+    } finally {
+      setRosterSaving(null);
+    }
+  }
+
   // ─── Auth gate ────────────────────────────────────────────────────────────
 
   if (!adminUser) {
@@ -417,8 +470,8 @@ export default function MichiganAdminPage() {
           <h2 className="text-sm font-bold text-white mb-2">Tournament Setup</h2>
           <p className="text-xs text-slate-400 mb-3">
             {allInitialized
-              ? "✓ All 10 group documents are initialized in Firestore."
-              : `${groups.length}/10 groups initialized. Click below to create any missing groups.`}
+              ? "✓ All 12 group documents are initialized in Firestore."
+              : `${groups.length}/12 groups initialized. Click below to create any missing groups.`}
           </p>
           <button
             onClick={initializeTournament}
@@ -484,6 +537,68 @@ export default function MichiganAdminPage() {
                   }`}>
                     {holesCompleted === 0 ? "Not started" : holesCompleted === players.length * 18 ? "Complete" : `In progress`}
                   </span>
+                </div>
+
+                {/* Roster */}
+                <div className="mb-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wide">Roster</p>
+                    {rosterEditing !== g.id && (
+                      <button
+                        onClick={() => {
+                          setRosterDraft((prev) => ({ ...prev, [g.id]: [...players] }));
+                          setRosterEditing(g.id);
+                          setRosterError(null);
+                        }}
+                        className="text-xs text-blue-400 hover:text-blue-300"
+                      >
+                        Edit
+                      </button>
+                    )}
+                  </div>
+                  {rosterEditing === g.id ? (
+                    <div className="space-y-2">
+                      {[0, 1, 2].map((slot) => (
+                        <select
+                          key={slot}
+                          value={rosterDraft[g.id]?.[slot] ?? ""}
+                          onChange={(e) => {
+                            const updated = [...(rosterDraft[g.id] ?? ["", "", ""])];
+                            updated[slot] = e.target.value;
+                            setRosterDraft((prev) => ({ ...prev, [g.id]: updated }));
+                          }}
+                          className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
+                        >
+                          <option value="">— select player —</option>
+                          {ALL_PLAYERS.map((p) => (
+                            <option key={p} value={p}>{p}</option>
+                          ))}
+                        </select>
+                      ))}
+                      {rosterError && <p className="text-red-400 text-xs">{rosterError}</p>}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => saveRoster(g.id)}
+                          disabled={rosterSaving === g.id}
+                          className="flex-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-xl py-2 text-xs font-semibold transition-colors"
+                        >
+                          {rosterSaving === g.id ? "Saving…" : "Save Roster"}
+                        </button>
+                        <button
+                          onClick={() => { setRosterEditing(null); setRosterError(null); }}
+                          className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-xl py-2 text-xs font-semibold transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-0.5">
+                      {players.map((p) => (
+                        <p key={p} className="text-xs text-slate-300 ml-1">• {p}</p>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Handicaps */}
