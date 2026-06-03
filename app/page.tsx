@@ -133,7 +133,7 @@ export default function Home() {
         >
           <p className="text-[10px] font-bold tracking-widest text-blue-200 uppercase mb-0.5">June 15–19 · Michigan</p>
           <p className="text-lg font-bold text-white">Michigan Golf Trip 2026</p>
-          <p className="text-xs text-blue-200 mt-0.5">Forest Dunes · Arcadia Bluffs · Bay Harbor · The Bear → tap to score</p>
+          <p className="text-xs text-blue-200 mt-0.5">The Bear · Arcadia Bluffs South · Bay Harbor · Forest Dunes · Arcadia Bluffs → tap to score</p>
         </button>
 
         <input

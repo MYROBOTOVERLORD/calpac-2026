@@ -32,11 +32,11 @@ const DAY_KEYS = ["day1", "day2", "day3", "day4", "day5"] as const;
 type DayKey = (typeof DAY_KEYS)[number];
 
 const DAY_INFO: Record<DayKey, { label: string; date: string; course: string }> = {
-  day1: { label: "Day 1", date: "June 15", course: "Spruce Run" },
-  day2: { label: "Day 2", date: "June 16", course: "The Bear" },
-  day3: { label: "Day 3", date: "June 17", course: "Arcadia Bluffs South" },
-  day4: { label: "Day 4", date: "June 18", course: "Bay Harbor Links/Quarry" },
-  day5: { label: "Day 5", date: "June 19", course: "Forest Dunes" },
+  day1: { label: "Day 1", date: "June 15", course: "The Bear" },
+  day2: { label: "Day 2", date: "June 16", course: "Arcadia Bluffs South" },
+  day3: { label: "Day 3", date: "June 17", course: "Bay Harbor Links/Quarry" },
+  day4: { label: "Day 4", date: "June 18", course: "Forest Dunes" },
+  day5: { label: "Day 5", date: "June 19", course: "Arcadia Bluffs" },
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

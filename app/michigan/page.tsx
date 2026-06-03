@@ -12,7 +12,7 @@ export const MICHIGAN_SCHEDULE = [
     dayKey: "day1",
     label: "Day 1",
     date: "June 15",
-    course: "Spruce Run",
+    course: "The Bear – Grand Traverse",
     groups: [
       { id: "day1-a", label: "Group A", players: ["Craig Lauderdale", "Jay Norwood", "Dave Laurance"] },
       { id: "day1-b", label: "Group B", players: ["Aaron Schliefer", "Frank Moslander", "Rick Lund"] },
@@ -22,7 +22,7 @@ export const MICHIGAN_SCHEDULE = [
     dayKey: "day2",
     label: "Day 2",
     date: "June 16",
-    course: "The Bear – Grand Traverse",
+    course: "Arcadia Bluffs South",
     groups: [
       { id: "day2-a", label: "Group A", players: ["Craig Lauderdale", "Aaron Schliefer", "Rick Lund"] },
       { id: "day2-b", label: "Group B", players: ["Jay Norwood", "Dave Laurance", "Frank Moslander"] },
@@ -32,7 +32,7 @@ export const MICHIGAN_SCHEDULE = [
     dayKey: "day3",
     label: "Day 3",
     date: "June 17",
-    course: "Arcadia Bluffs South",
+    course: "Bay Harbor Links/Quarry",
     groups: [
       { id: "day3-a", label: "Group A", players: ["Craig Lauderdale", "Frank Moslander", "Jay Norwood"] },
       { id: "day3-b", label: "Group B", players: ["Dave Laurance", "Aaron Schliefer", "Rick Lund"] },
@@ -42,7 +42,7 @@ export const MICHIGAN_SCHEDULE = [
     dayKey: "day4",
     label: "Day 4",
     date: "June 18",
-    course: "Bay Harbor Links/Quarry",
+    course: "Forest Dunes",
     groups: [
       { id: "day4-a", label: "Group A", players: ["Craig Lauderdale", "Dave Laurance", "Aaron Schliefer"] },
       { id: "day4-b", label: "Group B", players: ["Jay Norwood", "Frank Moslander", "Rick Lund"] },
@@ -52,7 +52,7 @@ export const MICHIGAN_SCHEDULE = [
     dayKey: "day5",
     label: "Day 5",
     date: "June 19",
-    course: "Forest Dunes",
+    course: "Arcadia Bluffs",
     groups: [
       { id: "day5-a", label: "Group A", players: ["Craig Lauderdale", "Rick Lund", "Frank Moslander"] },
       { id: "day5-b", label: "Group B", players: ["Jay Norwood", "Dave Laurance", "Aaron Schliefer"] },
