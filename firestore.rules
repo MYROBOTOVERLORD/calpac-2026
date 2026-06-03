@@ -14,6 +14,12 @@ service cloud.firestore {
       allow write: if request.auth != null;
     }
 
+    // Michigan tournament: public read, public write (same as groups — players are unauthenticated)
+    match /michigan/{groupId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
     // Calcutta: public read, event doc admin-write, team scores public-write
     match /calcuttaEvents/{eventId} {
       allow read: if true;

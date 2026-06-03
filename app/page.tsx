@@ -101,7 +101,7 @@ export default function Home() {
             <h1 className="text-2xl font-bold">Cal-Pac 2026</h1>
             <p className="text-slate-500 text-sm mt-0.5">Select your name to start scoring</p>
           </div>
-          <div className="flex gap-2 shrink-0">
+          <div className="flex gap-2 shrink-0 flex-wrap justify-end">
             <button
               onClick={() => router.push("/leaderboard")}
               className="bg-white border border-sky-200 rounded-xl px-3 py-2 text-sm font-semibold text-sky-700 hover:bg-sky-50 transition-colors"
@@ -125,6 +125,16 @@ export default function Home() {
             </button>
           </div>
         </div>
+
+        {/* Michigan Tournament Banner */}
+        <button
+          onClick={() => router.push("/michigan")}
+          className="w-full mb-5 bg-gradient-to-r from-blue-700 to-blue-500 rounded-2xl px-5 py-4 text-left hover:from-blue-600 hover:to-blue-400 transition-all active:scale-[0.99] shadow-md"
+        >
+          <p className="text-[10px] font-bold tracking-widest text-blue-200 uppercase mb-0.5">June 15–19 · Michigan</p>
+          <p className="text-lg font-bold text-white">Michigan Golf Trip 2026</p>
+          <p className="text-xs text-blue-200 mt-0.5">Forest Dunes · Arcadia Bluffs · Bay Harbor · The Bear → tap to score</p>
+        </button>
 
         <input
           value={search}
