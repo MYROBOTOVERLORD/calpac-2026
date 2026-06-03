@@ -9,13 +9,23 @@ import { db } from "@/lib/firebase";
 
 export const MICHIGAN_SCHEDULE = [
   {
-    dayKey: "day1",
-    label: "Day 1",
+    dayKey: "day1r1",
+    label: "Day 1 · Round 1",
+    date: "June 15",
+    course: "Spruce Run",
+    groups: [
+      { id: "day1r1-a", label: "Group A", players: ["Craig Lauderdale", "Jay Norwood", "Dave Laurance"] },
+      { id: "day1r1-b", label: "Group B", players: ["Aaron Schliefer", "Frank Moslander", "Rick Lund"] },
+    ],
+  },
+  {
+    dayKey: "day1r2",
+    label: "Day 1 · Round 2",
     date: "June 15",
     course: "The Bear – Grand Traverse",
     groups: [
-      { id: "day1-a", label: "Group A", players: ["Craig Lauderdale", "Jay Norwood", "Dave Laurance"] },
-      { id: "day1-b", label: "Group B", players: ["Aaron Schliefer", "Frank Moslander", "Rick Lund"] },
+      { id: "day1r2-a", label: "Group A", players: ["Craig Lauderdale", "Jay Norwood", "Dave Laurance"] },
+      { id: "day1r2-b", label: "Group B", players: ["Aaron Schliefer", "Frank Moslander", "Rick Lund"] },
     ],
   },
   {

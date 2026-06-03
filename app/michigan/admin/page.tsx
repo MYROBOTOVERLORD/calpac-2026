@@ -17,16 +17,29 @@ import { auth, db } from "@/lib/firebase";
 
 const MICHIGAN_SCHEDULE = [
   {
-    dayKey: "day1",
-    label: "Day 1",
+    dayKey: "day1r1",
+    label: "Day 1 · Round 1",
+    date: "June 15, 2026",
+    course: "spruce-run",
+    courseName: "Spruce Run",
+    pars: [4,4,3,5,4,4,3,5,4, 4,3,5,4,4,3,5,4,4],
+    hcps: [5,13,17,1,9,7,15,3,11, 2,14,18,6,10,16,4,12,8],
+    groups: [
+      { id: "day1r1-a", label: "Group A", players: ["Craig Lauderdale", "Jay Norwood", "Dave Laurance"] },
+      { id: "day1r1-b", label: "Group B", players: ["Aaron Schliefer", "Frank Moslander", "Rick Lund"] },
+    ],
+  },
+  {
+    dayKey: "day1r2",
+    label: "Day 1 · Round 2",
     date: "June 15, 2026",
     course: "the-bear",
     courseName: "The Bear – Grand Traverse",
     pars: [4,5,3,4,4,3,5,4,4, 4,3,5,4,4,5,3,4,4],
     hcps: [9,3,17,5,1,15,7,13,11, 4,16,6,12,2,10,18,8,14],
     groups: [
-      { id: "day1-a", label: "Group A", players: ["Craig Lauderdale", "Jay Norwood", "Dave Laurance"] },
-      { id: "day1-b", label: "Group B", players: ["Aaron Schliefer", "Frank Moslander", "Rick Lund"] },
+      { id: "day1r2-a", label: "Group A", players: ["Craig Lauderdale", "Jay Norwood", "Dave Laurance"] },
+      { id: "day1r2-b", label: "Group B", players: ["Aaron Schliefer", "Frank Moslander", "Rick Lund"] },
     ],
   },
   {
