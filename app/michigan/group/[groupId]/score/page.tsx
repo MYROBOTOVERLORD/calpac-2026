@@ -18,6 +18,7 @@ const COURSES_WITH_GREENS = new Set([
   "arcadia-bluffs-south",
   "arcadia-bluffs",
   "bay-harbor-links",
+  "forest-dunes",
 ]);
 
 // ─── Types ───────────────────────────────────────────────────────────────────
