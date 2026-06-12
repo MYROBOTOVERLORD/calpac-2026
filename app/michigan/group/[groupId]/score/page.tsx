@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useMemo } from "react";
+import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
 import {
   doc,
@@ -9,6 +10,15 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+
+// ─── Courses with greens images ─────────────────────────────────────────────
+const COURSES_WITH_GREENS = new Set([
+  "spruce-run",
+  "the-bear",
+  "arcadia-bluffs-south",
+  "arcadia-bluffs",
+  "bay-harbor-links",
+]);
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -192,6 +202,7 @@ export default function MichiganScoringPage() {
   const [saving, setSaving] = useState(false);
   const [tab, setTab] = useState<"score" | "leaderboard">("score");
   const [currentPlayer, setCurrentPlayer] = useState<string | null>(null);
+  const [showGreenModal, setShowGreenModal] = useState(false);
 
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ctpSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -364,6 +375,11 @@ export default function MichiganScoringPage() {
 
   const groupTitle = group?.groupName ?? groupId;
   const courseName = group?.courseName ?? group?.course ?? "Michigan";
+  const courseKey = group?.course ?? null;
+  const hasGreenImage = courseKey ? COURSES_WITH_GREENS.has(courseKey) : false;
+  const greenImageSrc = hasGreenImage && courseKey
+    ? `/greens/${courseKey}/hole-${currentHole + 1}.png`
+    : null;
   const dayLabel = group?.day ?? "";
   const dateLabel = group?.date ?? "";
 
@@ -428,9 +444,19 @@ export default function MichiganScoringPage() {
                   <p className="text-xs text-emerald-400 font-semibold mt-0.5">📍 Closest to Pin hole</p>
                 )}
               </div>
-              <div className="text-right">
-                <p className="text-xs text-slate-500">Par through</p>
-                <p className="text-lg font-bold text-slate-300">{parThrough}</p>
+              <div className="flex flex-col items-end gap-2">
+                <div className="text-right">
+                  <p className="text-xs text-slate-500">Par through</p>
+                  <p className="text-lg font-bold text-slate-300">{parThrough}</p>
+                </div>
+                {hasGreenImage && (
+                  <button
+                    onClick={() => setShowGreenModal(true)}
+                    className="bg-emerald-700 hover:bg-emerald-600 active:scale-95 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-all"
+                  >
+                    🗺️ Green
+                  </button>
+                )}
               </div>
             </div>
 
@@ -630,6 +656,40 @@ export default function MichiganScoringPage() {
           </div>
         )}
       </div>
+      {/* Green view modal */}
+      {showGreenModal && greenImageSrc && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
+          onClick={() => setShowGreenModal(false)}
+        >
+          <div
+            className="relative bg-slate-900 rounded-2xl overflow-hidden max-w-sm w-full shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700">
+              <p className="text-sm font-semibold text-white">
+                Hole {currentHole + 1} · {courseName}
+              </p>
+              <button
+                onClick={() => setShowGreenModal(false)}
+                className="text-slate-400 hover:text-white text-xl leading-none px-1"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="relative w-full">
+              <Image
+                src={greenImageSrc}
+                alt={`Hole ${currentHole + 1} green view`}
+                width={768}
+                height={806}
+                className="w-full h-auto"
+                priority
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
