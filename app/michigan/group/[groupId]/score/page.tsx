@@ -21,6 +21,11 @@ const COURSES_WITH_GREENS = new Set([
   "forest-dunes",
 ]);
 
+const ALL_PLAYERS = [
+  "Craig Lauderdale", "Jay Norwood", "Dave Laurance",
+  "Aaron Schliefer", "Frank Moslander", "Rick Lund",
+];
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 type ContestWinnerNote = { winner?: string | null; note?: string | null };
@@ -556,16 +561,14 @@ export default function MichiganScoringPage() {
                       <div key={holeNum} className="bg-slate-800 rounded-xl px-4 py-3">
                         <p className="text-xs font-semibold text-slate-400 mb-2">Hole {holeNum} (Par {par3Par})</p>
                         <div className="flex gap-2">
-                          <input
+                          <select
                             value={entry?.winner ?? ""}
                             onChange={(e) => updateCtp(holeNum, "winner", e.target.value)}
-                            placeholder="Winner name…"
-                            list={`ctp-players-${holeNum}`}
-                            className="flex-1 bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-blue-500"
-                          />
-                          <datalist id={`ctp-players-${holeNum}`}>
-                            {players.map((p) => <option key={p} value={p} />)}
-                          </datalist>
+                            className="flex-1 bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
+                          >
+                            <option value="">Select winner…</option>
+                            {ALL_PLAYERS.map((p) => <option key={p} value={p}>{p}</option>)}
+                          </select>
                           <input
                             value={entry?.note ?? ""}
                             onChange={(e) => updateCtp(holeNum, "note", e.target.value)}

@@ -40,6 +40,11 @@ const DAY_INFO: Record<DayKey, { label: string; date: string; course: string }> 
   day5: { label: "Day 5", date: "June 19", course: "Arcadia Bluffs" },
 };
 
+const ALL_PLAYERS = [
+  "Craig Lauderdale", "Jay Norwood", "Dave Laurance",
+  "Aaron Schliefer", "Frank Moslander", "Rick Lund",
+];
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function arrSum(arr: (number | null)[]): number {
@@ -97,13 +102,14 @@ type PlayerDayRow = {
   groupName: string;
 };
 
-type OverallRow = {
+type PointsRow = {
   player: string;
+  totalPoints: number;
+  roundPoints: number;
+  ctpPoints: number;
   roundsComplete: number;
   roundsInProgress: number;
-  totalGross: number;
-  totalNet: number;
-  handicap: number;
+  pointsByDay: Partial<Record<DayKey, number>>;
 };
 
 type CtpEntry = { hole: string; winner: string; note: string; groupName: string; course: string };
@@ -133,42 +139,79 @@ function computeDayRows(groups: MichiganGroupDoc[], dayKey: DayKey): PlayerDayRo
   return rows;
 }
 
-function computeOverall(groups: MichiganGroupDoc[]): OverallRow[] {
-  const playerMap = new Map<string, { roundsComplete: number; roundsInProgress: number; totalGross: number; totalNet: number; handicap: number }>();
+function computePointsStandings(groups: MichiganGroupDoc[]): PointsRow[] {
+  const map = new Map<string, { roundPoints: number; ctpPoints: number; roundsComplete: number; roundsInProgress: number; pointsByDay: Partial<Record<DayKey, number>> }>();
+  for (const p of ALL_PLAYERS) {
+    map.set(p, { roundPoints: 0, ctpPoints: 0, roundsComplete: 0, roundsInProgress: 0, pointsByDay: {} });
+  }
 
-  for (const g of groups) {
-    const players = (g.players ?? []).filter(Boolean);
-    const hcps = Array.isArray(g.hcps) && g.hcps.length === HOLE_COUNT ? g.hcps : null;
-    for (const p of players) {
-      const s: (number | null)[] = Array.isArray(g.scores?.[p])
-        ? (g.scores![p] as (number | null)[])
-        : Array.from({ length: HOLE_COUNT }, () => null);
-      const hcp = typeof g.handicaps?.[p] === "number" ? (g.handicaps![p] as number) : 0;
-      const holesPlayed = s.filter((v) => typeof v === "number").length;
-      if (holesPlayed === 0) continue;
-      const complete = isCompleteRound(s);
-      const gross = arrSum(s);
-      const net = calcNet(s, hcps, hcp);
-      const existing = playerMap.get(p) ?? { roundsComplete: 0, roundsInProgress: 0, totalGross: 0, totalNet: 0, handicap: hcp };
-      playerMap.set(p, {
-        roundsComplete: existing.roundsComplete + (complete ? 1 : 0),
-        roundsInProgress: existing.roundsInProgress + (complete ? 0 : 1),
-        totalGross: existing.totalGross + gross,
-        totalNet: existing.totalNet + net,
-        handicap: hcp,
-      });
+  // Round points per day: rank all 6 players together, 1st=6pts … 6th=1pt
+  for (const dayKey of DAY_KEYS) {
+    const dayGroups = groups.filter((g) => g.day === dayKey);
+    const allScores: { player: string; net: number; complete: boolean }[] = [];
+
+    for (const g of dayGroups) {
+      const players = (g.players ?? []).filter(Boolean);
+      const hcps = Array.isArray(g.hcps) && g.hcps.length === HOLE_COUNT ? g.hcps : null;
+      for (const p of players) {
+        const s: (number | null)[] = Array.isArray(g.scores?.[p])
+          ? (g.scores![p] as (number | null)[])
+          : Array.from({ length: HOLE_COUNT }, () => null);
+        const hcp = typeof g.handicaps?.[p] === "number" ? (g.handicaps![p] as number) : 0;
+        const holesPlayed = s.filter((v) => typeof v === "number").length;
+        if (holesPlayed === 0) continue;
+        const complete = isCompleteRound(s);
+        const net = calcNet(s, hcps, hcp);
+        allScores.push({ player: p, net, complete });
+        if (!complete) {
+          const entry = map.get(p);
+          if (entry) entry.roundsInProgress = Math.max(entry.roundsInProgress, 1);
+        }
+      }
+    }
+
+    const completeScores = allScores.filter((s) => s.complete);
+    if (completeScores.length === 0) continue;
+
+    // Sort ascending by net score
+    completeScores.sort((a, b) => a.net - b.net);
+
+    // Assign points with tie handling: tied players share the same (higher) rank
+    let rank = 1;
+    for (let i = 0; i < completeScores.length; i++) {
+      if (i > 0 && completeScores[i].net !== completeScores[i - 1].net) rank = i + 1;
+      const pts = Math.max(0, 7 - rank);
+      const entry = map.get(completeScores[i].player);
+      if (entry) {
+        entry.roundPoints += pts;
+        entry.roundsComplete++;
+        entry.pointsByDay[dayKey] = pts;
+      }
     }
   }
 
-  return [...playerMap.entries()]
-    .map(([player, data]) => ({ player, ...data }))
-    .sort((a, b) => {
-      const aActive = a.roundsComplete + a.roundsInProgress;
-      const bActive = b.roundsComplete + b.roundsInProgress;
-      if (aActive === 0 && bActive > 0) return 1;
-      if (bActive === 0 && aActive > 0) return -1;
-      return a.totalNet - b.totalNet || a.totalGross - b.totalGross;
-    });
+  // CTP bonus: +1 point per closest-to-pin hole won
+  for (const g of groups) {
+    const ctpMap = g.contest?.closestToPinByHole ?? {};
+    for (const [, val] of Object.entries(ctpMap)) {
+      if (val?.winner) {
+        const entry = map.get(val.winner);
+        if (entry) entry.ctpPoints++;
+      }
+    }
+  }
+
+  return [...map.entries()]
+    .map(([player, data]) => ({
+      player,
+      totalPoints: data.roundPoints + data.ctpPoints,
+      roundPoints: data.roundPoints,
+      ctpPoints: data.ctpPoints,
+      roundsComplete: data.roundsComplete,
+      roundsInProgress: data.roundsInProgress,
+      pointsByDay: data.pointsByDay,
+    }))
+    .sort((a, b) => b.totalPoints - a.totalPoints || b.roundsComplete - a.roundsComplete || a.player.localeCompare(b.player));
 }
 
 function computeCtpEntries(groups: MichiganGroupDoc[], dayKey: DayKey): CtpEntry[] {
@@ -219,7 +262,7 @@ export default function MichiganLeaderboardPage() {
     return computeDayRows(groups, selectedDay as DayKey);
   }, [groups, selectedDay]);
 
-  const overallRows = useMemo(() => computeOverall(groups), [groups]);
+  const pointsRows = useMemo(() => computePointsStandings(groups), [groups]);
 
   const sortedDayRows = useMemo(() => {
     const rows = [...dayRows];
@@ -340,7 +383,7 @@ export default function MichiganLeaderboardPage() {
         )}
         {selectedDay === "overall" && (
           <p className="text-xs text-slate-500 uppercase tracking-wide font-semibold mb-3">
-            Cumulative · Net Total · includes rounds in progress
+            Points Standings · 6 pts for 1st place · +1 per CTP win
           </p>
         )}
 
@@ -351,45 +394,43 @@ export default function MichiganLeaderboardPage() {
             <div className="flex items-center px-3 mb-1 gap-2">
               <span className="w-6 shrink-0" />
               <span className="flex-1" />
-              <span className="text-[10px] text-slate-600 w-14 text-right shrink-0">Rounds</span>
-              <span className="text-[10px] text-slate-600 w-14 text-right shrink-0">Gross</span>
-              <span className="text-[10px] text-slate-600 w-14 text-right shrink-0">Net</span>
+              <span className="text-[10px] text-slate-600 w-8 text-right shrink-0">Rnds</span>
+              <span className="text-[10px] text-slate-600 w-16 text-right shrink-0">Rnd+CTP</span>
+              <span className="text-[10px] text-slate-600 w-12 text-right shrink-0">Points</span>
             </div>
             <div className="space-y-1.5 mb-6">
-              {overallRows.map((r, i) => {
-                const active = r.roundsComplete + r.roundsInProgress;
-                const inProg = r.roundsInProgress > 0;
+              {pointsRows.map((r, i) => {
+                const hasActivity = r.roundsComplete + r.roundsInProgress > 0;
+                const isLead = i === 0 && hasActivity;
                 return (
                   <div
                     key={r.player}
                     className={`flex items-center gap-2 rounded-xl px-3 py-3 ${
-                      i === 0 && active > 0 ? "bg-blue-900/40 border border-blue-800/50" : "bg-slate-800"
+                      isLead ? "bg-blue-900/40 border border-blue-800/50" : "bg-slate-800"
                     }`}
                   >
-                    <span className={`text-sm font-bold w-6 shrink-0 ${i === 0 && active > 0 ? "text-blue-400" : "text-slate-600"}`}>
-                      {active > 0 ? i + 1 : "—"}
+                    <span className={`text-sm font-bold w-6 shrink-0 ${isLead ? "text-blue-400" : "text-slate-600"}`}>
+                      {hasActivity ? i + 1 : "—"}
                     </span>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-white truncate">{r.player}</p>
                       <p className="text-[11px] text-slate-500">
-                        Hcp {r.handicap}{inProg ? ` · ${r.roundsInProgress} in progress` : ""}
+                        {r.roundsComplete}/6 rounds{r.ctpPoints > 0 ? ` · +${r.ctpPoints} CTP` : ""}{r.roundsInProgress > 0 ? ` · ${r.roundsInProgress} in prog` : ""}
                       </p>
                     </div>
-                    <span className="text-xs text-slate-500 w-14 text-right shrink-0">
-                      {active > 0
-                        ? `${r.roundsComplete}/6${inProg ? ` +${r.roundsInProgress}▶` : ""}`
-                        : "—"}
+                    <span className="text-xs text-slate-600 w-8 text-right shrink-0">
+                      {hasActivity ? r.roundsComplete : "—"}
                     </span>
-                    <span className="text-sm font-bold text-slate-400 w-14 text-right shrink-0">
-                      {active > 0 ? r.totalGross : "—"}
+                    <span className="text-xs text-slate-400 w-16 text-right shrink-0">
+                      {hasActivity ? `${r.roundPoints} + ${r.ctpPoints}` : "—"}
                     </span>
-                    <span className={`text-sm font-bold w-14 text-right shrink-0 ${active > 0 ? "text-white" : "text-slate-600"}`}>
-                      {active > 0 ? r.totalNet : "—"}
+                    <span className={`text-sm font-bold w-12 text-right shrink-0 ${isLead ? "text-yellow-400" : hasActivity ? "text-white" : "text-slate-600"}`}>
+                      {hasActivity ? r.totalPoints : "—"}
                     </span>
                   </div>
                 );
               })}
-              {overallRows.length === 0 && (
+              {pointsRows.every((r) => r.roundsComplete + r.roundsInProgress === 0) && (
                 <p className="text-center text-slate-600 text-sm mt-6">No scores recorded yet.</p>
               )}
             </div>
