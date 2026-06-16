@@ -2,34 +2,20 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { collection, onSnapshot } from "firebase/firestore";
+import { collection, doc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-
-// ─── Types ───────────────────────────────────────────────────────────────────
-
-type ContestWinnerNote = { winner?: string | null; note?: string | null };
-
-type MichiganGroupDoc = {
-  id: string;
-  day?: string;
-  groupName?: string;
-  groupLabel?: string;
-  players?: string[];
-  course?: string;
-  courseName?: string;
-  date?: string;
-  pars?: number[];
-  hcps?: number[];
-  scores?: Record<string, (number | null)[]>;
-  handicaps?: Record<string, number | null>;
-  contest?: {
-    closestToPinByHole?: Record<string, ContestWinnerNote>;
-  };
-};
-
-const HOLE_COUNT = 18;
-const DAY_KEYS = ["day1r1", "day1r2", "day2", "day3", "day4", "day5"] as const;
-type DayKey = (typeof DAY_KEYS)[number];
+import {
+  DAY_KEYS,
+  HOLE_COUNT,
+  arrSum,
+  calcNet,
+  computePointsStandings,
+  fmtToPar,
+  grossToPar,
+  type DayKey,
+  type MichiganGroupDoc,
+  type PointOverrides,
+} from "@/lib/michiganPoints";
 
 const DAY_INFO: Record<DayKey, { label: string; date: string; course: string }> = {
   day1r1: { label: "Day 1 · R1", date: "June 15", course: "Spruce Run" },
@@ -39,56 +25,6 @@ const DAY_INFO: Record<DayKey, { label: string; date: string; course: string }> 
   day4: { label: "Day 4", date: "June 18", course: "Forest Dunes" },
   day5: { label: "Day 5", date: "June 19", course: "Arcadia Bluffs" },
 };
-
-const ALL_PLAYERS = [
-  "Craig Lauderdale", "Jay Norwood", "Dave Laurance",
-  "Aaron Schliefer", "Frank Moslander", "Rick Lund",
-];
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function arrSum(arr: (number | null)[]): number {
-  return arr.reduce<number>((a, v) => (typeof v === "number" ? a + v : a), 0);
-}
-
-function isCompleteRound(arr?: (number | null)[]): boolean {
-  return !!arr && arr.length === HOLE_COUNT && arr.every((v) => typeof v === "number");
-}
-
-function strokesForHole(hcpIdx: number, total: number): number {
-  const s = Math.floor(total);
-  if (!Number.isFinite(hcpIdx) || hcpIdx < 1 || hcpIdx > 18 || s <= 0) return 0;
-  if (s < hcpIdx) return 0;
-  return 1 + Math.floor((s - hcpIdx) / 18);
-}
-
-function calcNet(
-  scores: (number | null)[],
-  hcps: number[] | null,
-  handicap: number
-): number {
-  const gross = arrSum(scores);
-  if (!hcps || hcps.length !== HOLE_COUNT) {
-    return isCompleteRound(scores) ? gross - Math.floor(handicap) : gross;
-  }
-  const strokes = scores.reduce<number>(
-    (acc, v, i) => (typeof v === "number" ? acc + strokesForHole(hcps[i], handicap) : acc),
-    0
-  );
-  return gross - strokes;
-}
-
-function grossToPar(scores: (number | null)[], pars: number[] | null): number | null {
-  if (!pars || pars.length !== HOLE_COUNT) return null;
-  let g = 0, p = 0, n = 0;
-  scores.forEach((v, i) => { if (typeof v === "number") { g += v; p += pars[i] ?? 0; n++; } });
-  return n === 0 ? null : g - p;
-}
-
-function fmtToPar(v: number | null): string {
-  if (v == null) return "—";
-  return v === 0 ? "E" : v < 0 ? String(v) : `+${v}`;
-}
 
 // ─── Row types ────────────────────────────────────────────────────────────────
 
@@ -102,16 +38,6 @@ type PlayerDayRow = {
   groupName: string;
 };
 
-type PointsRow = {
-  player: string;
-  totalPoints: number;
-  roundPoints: number;
-  ctpPoints: number;
-  roundsComplete: number;
-  roundsInProgress: number;
-  pointsByDay: Partial<Record<DayKey, number>>;
-};
-
 type CtpEntry = { hole: string; winner: string; note: string; groupName: string; course: string };
 
 // ─── Compute functions ────────────────────────────────────────────────────────
@@ -123,7 +49,7 @@ function computeDayRows(groups: MichiganGroupDoc[], dayKey: DayKey): PlayerDayRo
     const players = (g.players ?? []).filter(Boolean);
     const pars = Array.isArray(g.pars) && g.pars.length === HOLE_COUNT ? g.pars : null;
     const hcps = Array.isArray(g.hcps) && g.hcps.length === HOLE_COUNT ? g.hcps : null;
-    const groupName = g.groupName ?? g.id;
+    const groupName = g.groupName ?? g.id ?? "";
     for (const p of players) {
       const s: (number | null)[] = Array.isArray(g.scores?.[p])
         ? (g.scores![p] as (number | null)[])
@@ -139,81 +65,6 @@ function computeDayRows(groups: MichiganGroupDoc[], dayKey: DayKey): PlayerDayRo
   return rows;
 }
 
-function computePointsStandings(groups: MichiganGroupDoc[]): PointsRow[] {
-  const map = new Map<string, { roundPoints: number; ctpPoints: number; roundsComplete: number; roundsInProgress: number; pointsByDay: Partial<Record<DayKey, number>> }>();
-  for (const p of ALL_PLAYERS) {
-    map.set(p, { roundPoints: 0, ctpPoints: 0, roundsComplete: 0, roundsInProgress: 0, pointsByDay: {} });
-  }
-
-  // Round points per day: rank all 6 players together, 1st=6pts … 6th=1pt
-  for (const dayKey of DAY_KEYS) {
-    const dayGroups = groups.filter((g) => g.day === dayKey);
-    const allScores: { player: string; net: number; complete: boolean }[] = [];
-
-    for (const g of dayGroups) {
-      const players = (g.players ?? []).filter(Boolean);
-      const hcps = Array.isArray(g.hcps) && g.hcps.length === HOLE_COUNT ? g.hcps : null;
-      for (const p of players) {
-        const s: (number | null)[] = Array.isArray(g.scores?.[p])
-          ? (g.scores![p] as (number | null)[])
-          : Array.from({ length: HOLE_COUNT }, () => null);
-        const hcp = typeof g.handicaps?.[p] === "number" ? (g.handicaps![p] as number) : 0;
-        const holesPlayed = s.filter((v) => typeof v === "number").length;
-        if (holesPlayed === 0) continue;
-        const complete = isCompleteRound(s);
-        const net = calcNet(s, hcps, hcp);
-        allScores.push({ player: p, net, complete });
-        if (!complete) {
-          const entry = map.get(p);
-          if (entry) entry.roundsInProgress = Math.max(entry.roundsInProgress, 1);
-        }
-      }
-    }
-
-    const completeScores = allScores.filter((s) => s.complete);
-    if (completeScores.length === 0) continue;
-
-    // Sort ascending by net score
-    completeScores.sort((a, b) => a.net - b.net);
-
-    // Assign points with tie handling: tied players share the same (higher) rank
-    let rank = 1;
-    for (let i = 0; i < completeScores.length; i++) {
-      if (i > 0 && completeScores[i].net !== completeScores[i - 1].net) rank = i + 1;
-      const pts = Math.max(0, 7 - rank);
-      const entry = map.get(completeScores[i].player);
-      if (entry) {
-        entry.roundPoints += pts;
-        entry.roundsComplete++;
-        entry.pointsByDay[dayKey] = pts;
-      }
-    }
-  }
-
-  // CTP bonus: +1 point per closest-to-pin hole won
-  for (const g of groups) {
-    const ctpMap = g.contest?.closestToPinByHole ?? {};
-    for (const [, val] of Object.entries(ctpMap)) {
-      if (val?.winner) {
-        const entry = map.get(val.winner);
-        if (entry) entry.ctpPoints++;
-      }
-    }
-  }
-
-  return [...map.entries()]
-    .map(([player, data]) => ({
-      player,
-      totalPoints: data.roundPoints + data.ctpPoints,
-      roundPoints: data.roundPoints,
-      ctpPoints: data.ctpPoints,
-      roundsComplete: data.roundsComplete,
-      roundsInProgress: data.roundsInProgress,
-      pointsByDay: data.pointsByDay,
-    }))
-    .sort((a, b) => b.totalPoints - a.totalPoints || b.roundsComplete - a.roundsComplete || a.player.localeCompare(b.player));
-}
-
 function computeCtpEntries(groups: MichiganGroupDoc[], dayKey: DayKey): CtpEntry[] {
   const dayGroups = groups.filter((g) => g.day === dayKey);
   const entries: CtpEntry[] = [];
@@ -225,7 +76,7 @@ function computeCtpEntries(groups: MichiganGroupDoc[], dayKey: DayKey): CtpEntry
           hole,
           winner: val.winner,
           note: val.note ?? "",
-          groupName: g.groupName ?? g.id,
+          groupName: g.groupName ?? g.id ?? "",
           course: g.courseName ?? g.course ?? "",
         });
       }
@@ -239,6 +90,7 @@ function computeCtpEntries(groups: MichiganGroupDoc[], dayKey: DayKey): CtpEntry
 export default function MichiganLeaderboardPage() {
   const router = useRouter();
   const [groups, setGroups] = useState<MichiganGroupDoc[]>([]);
+  const [pointOverrides, setPointOverrides] = useState<PointOverrides>({});
   const [loading, setLoading] = useState(true);
   const [selectedDay, setSelectedDay] = useState<DayKey | "overall">("overall");
   const [boardType, setBoardType] = useState<"net" | "gross">("net");
@@ -257,12 +109,19 @@ export default function MichiganLeaderboardPage() {
     return () => unsub();
   }, []);
 
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, "michiganMeta", "pointOverrides"), (snap) => {
+      setPointOverrides((snap.data() as PointOverrides) ?? {});
+    });
+    return () => unsub();
+  }, []);
+
   const dayRows = useMemo(() => {
     if (selectedDay === "overall") return [];
     return computeDayRows(groups, selectedDay as DayKey);
   }, [groups, selectedDay]);
 
-  const pointsRows = useMemo(() => computePointsStandings(groups), [groups]);
+  const pointsRows = useMemo(() => computePointsStandings(groups, pointOverrides), [groups, pointOverrides]);
 
   const sortedDayRows = useMemo(() => {
     const rows = [...dayRows];

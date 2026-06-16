@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   collection,
+  deleteField,
   doc,
   onSnapshot,
   serverTimestamp,
@@ -12,6 +13,7 @@ import {
 } from "firebase/firestore";
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut, type User } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
+import { computeDayPoints, type DayKey, type PointOverrides } from "@/lib/michiganPoints";
 
 // ─── Schedule definition (mirrors michigan/page.tsx) ─────────────────────────
 
@@ -184,11 +186,14 @@ export default function MichiganAdminPage() {
   const [scorecardSaving, setScorecardSaving] = useState<string | null>(null);
   const [scorecardError, setScorecardError] = useState<string | null>(null);
 
-  // Roster editor
-  const [rosterEditing, setRosterEditing] = useState<string | null>(null);
-  const [rosterDraft, setRosterDraft] = useState<Record<string, string[]>>({});
+  // Roster editor (inline, per-slot auto-save)
   const [rosterSaving, setRosterSaving] = useState<string | null>(null);
-  const [rosterError, setRosterError] = useState<string | null>(null);
+  const [rosterErrors, setRosterErrors] = useState<Record<string, string | null>>({});
+
+  // Points override editor: { [dayKey]: { [player]: string } }
+  const [pointOverrides, setPointOverrides] = useState<PointOverrides>({});
+  const [overrideDrafts, setOverrideDrafts] = useState<Record<string, Record<string, string>>>({});
+  const overrideSaveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => setAdminUser(u));
@@ -207,6 +212,30 @@ export default function MichiganAdminPage() {
     );
     return () => unsub();
   }, [isAdmin]);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    const unsub = onSnapshot(doc(db, "michiganMeta", "pointOverrides"), (snap) => {
+      setPointOverrides((snap.data() as PointOverrides) ?? {});
+    });
+    return () => unsub();
+  }, [isAdmin]);
+
+  // Populate override drafts when overrides load (don't clobber values the admin is mid-typing)
+  useEffect(() => {
+    setOverrideDrafts((prev) => {
+      const next = { ...prev };
+      for (const dayKey of Object.keys(pointOverrides) as DayKey[]) {
+        const dayOverrides = pointOverrides[dayKey] ?? {};
+        for (const [player, value] of Object.entries(dayOverrides)) {
+          if (next[dayKey]?.[player] === undefined) {
+            next[dayKey] = { ...(next[dayKey] ?? {}), [player]: String(value) };
+          }
+        }
+      }
+      return next;
+    });
+  }, [pointOverrides]);
 
   // Populate draft state when groups load
   useEffect(() => {
@@ -337,51 +366,72 @@ export default function MichiganAdminPage() {
     }
   }
 
-  async function saveRoster(groupId: string) {
-    const newPlayers = rosterDraft[groupId];
-    if (!newPlayers || newPlayers.some((p) => !p)) {
-      setRosterError("All player slots must be filled.");
-      return;
-    }
-    if (new Set(newPlayers).size !== newPlayers.length) {
-      setRosterError("Each player can only appear once in a group.");
-      return;
-    }
-    // Check for overlap with sibling groups on the same day
+  async function handleRosterSlotChange(groupId: string, slot: number, newPlayer: string) {
     const g = groups.find((x) => x.id === groupId);
-    if (g) {
+    if (!g) return;
+    const updated = [...(g.players ?? ["", "", ""])];
+    updated[slot] = newPlayer;
+
+    if (newPlayer) {
+      if (updated.some((p, i) => i !== slot && p === newPlayer)) {
+        setRosterErrors((prev) => ({ ...prev, [groupId]: `${newPlayer} is already in this group.` }));
+        return;
+      }
       const siblings = groups.filter((x) => x.day === g.day && x.id !== groupId);
-      const siblingPlayers = siblings.flatMap((s) => s.players ?? []);
-      const conflict = newPlayers.find((p) => siblingPlayers.includes(p));
+      const conflict = siblings.some((s) => (s.players ?? []).includes(newPlayer));
       if (conflict) {
-        setRosterError(`${conflict} is already in another group for this round.`);
+        setRosterErrors((prev) => ({ ...prev, [groupId]: `${newPlayer} is already in another group for this round.` }));
         return;
       }
     }
+
+    setRosterErrors((prev) => ({ ...prev, [groupId]: null }));
     setRosterSaving(groupId);
-    setRosterError(null);
-    const existing = groups.find((x) => x.id === groupId);
     const newScores: Record<string, (number | null)[]> = {};
     const newHandicaps: Record<string, number | null> = {};
-    for (const p of newPlayers) {
-      newScores[p] = Array.isArray(existing?.scores?.[p])
-        ? (existing!.scores![p] as (number | null)[])
+    for (const p of updated) {
+      if (!p) continue;
+      newScores[p] = Array.isArray(g.scores?.[p])
+        ? (g.scores![p] as (number | null)[])
         : Array.from({ length: HOLE_COUNT }, () => null);
-      newHandicaps[p] = typeof existing?.handicaps?.[p] === "number" ? existing!.handicaps![p] : null;
+      newHandicaps[p] = typeof g.handicaps?.[p] === "number" ? (g.handicaps![p] as number) : null;
     }
     try {
       await updateDoc(doc(db, "michigan", groupId), {
-        players: newPlayers,
+        players: updated,
         scores: newScores,
         handicaps: newHandicaps,
         updatedAt: serverTimestamp(),
       });
-      setRosterEditing(null);
     } catch (err) {
-      setRosterError(err instanceof Error ? err.message : "Save failed.");
+      setRosterErrors((prev) => ({ ...prev, [groupId]: err instanceof Error ? err.message : "Save failed." }));
     } finally {
       setRosterSaving(null);
     }
+  }
+
+  function handleOverrideChange(dayKey: DayKey, player: string, raw: string) {
+    setOverrideDrafts((prev) => ({
+      ...prev,
+      [dayKey]: { ...(prev[dayKey] ?? {}), [player]: raw },
+    }));
+
+    const timerKey = `${dayKey}:${player}`;
+    if (overrideSaveTimers.current[timerKey]) clearTimeout(overrideSaveTimers.current[timerKey]);
+    overrideSaveTimers.current[timerKey] = setTimeout(async () => {
+      const trimmed = raw.trim();
+      const value = trimmed === "" ? null : Number(trimmed);
+      if (value !== null && !Number.isFinite(value)) return;
+      try {
+        await setDoc(
+          doc(db, "michiganMeta", "pointOverrides"),
+          { [dayKey]: { [player]: value === null ? deleteField() : value } },
+          { merge: true }
+        );
+      } catch (err) {
+        console.error(err);
+      }
+    }, 600);
   }
 
   // ─── Auth gate ────────────────────────────────────────────────────────────
@@ -543,62 +593,24 @@ export default function MichiganAdminPage() {
                 <div className="mb-4">
                   <div className="flex items-center justify-between mb-2">
                     <p className="text-xs font-bold text-slate-400 uppercase tracking-wide">Roster</p>
-                    {rosterEditing !== g.id && (
-                      <button
-                        onClick={() => {
-                          setRosterDraft((prev) => ({ ...prev, [g.id]: [...players] }));
-                          setRosterEditing(g.id);
-                          setRosterError(null);
-                        }}
-                        className="text-xs text-blue-400 hover:text-blue-300"
-                      >
-                        Edit
-                      </button>
-                    )}
+                    {rosterSaving === g.id && <span className="text-[10px] text-slate-500">Saving…</span>}
                   </div>
-                  {rosterEditing === g.id ? (
-                    <div className="space-y-2">
-                      {[0, 1, 2].map((slot) => (
-                        <select
-                          key={slot}
-                          value={rosterDraft[g.id]?.[slot] ?? ""}
-                          onChange={(e) => {
-                            const updated = [...(rosterDraft[g.id] ?? ["", "", ""])];
-                            updated[slot] = e.target.value;
-                            setRosterDraft((prev) => ({ ...prev, [g.id]: updated }));
-                          }}
-                          className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
-                        >
-                          <option value="">— select player —</option>
-                          {ALL_PLAYERS.map((p) => (
-                            <option key={p} value={p}>{p}</option>
-                          ))}
-                        </select>
-                      ))}
-                      {rosterError && <p className="text-red-400 text-xs">{rosterError}</p>}
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => saveRoster(g.id)}
-                          disabled={rosterSaving === g.id}
-                          className="flex-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-xl py-2 text-xs font-semibold transition-colors"
-                        >
-                          {rosterSaving === g.id ? "Saving…" : "Save Roster"}
-                        </button>
-                        <button
-                          onClick={() => { setRosterEditing(null); setRosterError(null); }}
-                          className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-xl py-2 text-xs font-semibold transition-colors"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-0.5">
-                      {players.map((p) => (
-                        <p key={p} className="text-xs text-slate-300 ml-1">• {p}</p>
-                      ))}
-                    </div>
-                  )}
+                  <div className="space-y-2">
+                    {[0, 1, 2].map((slot) => (
+                      <select
+                        key={slot}
+                        value={players[slot] ?? ""}
+                        onChange={(e) => handleRosterSlotChange(g.id, slot, e.target.value)}
+                        className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
+                      >
+                        <option value="">— select player —</option>
+                        {ALL_PLAYERS.map((p) => (
+                          <option key={p} value={p}>{p}</option>
+                        ))}
+                      </select>
+                    ))}
+                  </div>
+                  {rosterErrors[g.id] && <p className="text-red-400 text-xs mt-1">{rosterErrors[g.id]}</p>}
                 </div>
 
                 {/* Handicaps */}
@@ -731,6 +743,44 @@ export default function MichiganAdminPage() {
               </div>
             </div>
           ))}
+        </div>
+
+        {/* Points override — manual fix for bad historical data */}
+        <div className="bg-slate-800 rounded-2xl p-4 mb-4 border border-amber-800/50">
+          <h2 className="text-sm font-bold text-white mb-1">⚠️ Points Override</h2>
+          <p className="text-xs text-slate-400 mb-4">
+            Manually fix a player&apos;s round points if a round was scored with bad data. Leave blank to use the
+            computed value. Overridden rounds still count toward &quot;rounds complete&quot; on the leaderboard.
+          </p>
+          {MICHIGAN_SCHEDULE.map((day) => {
+            const dayKey = day.dayKey as DayKey;
+            const computed = computeDayPoints(groups, dayKey);
+            const players = day.groups.flatMap((g) => g.players);
+            return (
+              <div key={day.dayKey} className="mb-4 last:mb-0">
+                <p className="text-xs font-bold text-blue-400 mb-2">{day.label} · {day.courseName}</p>
+                <div className="space-y-1.5">
+                  {players.map((player) => (
+                    <div key={player} className="flex items-center gap-2">
+                      <span className="text-sm text-slate-300 flex-1 truncate">{player}</span>
+                      <span className="text-[11px] text-slate-500 w-24 text-right">
+                        computed {typeof computed[player] === "number" ? computed[player] : "—"}
+                      </span>
+                      <input
+                        type="number"
+                        min={0}
+                        max={6}
+                        value={overrideDrafts[dayKey]?.[player] ?? ""}
+                        onChange={(e) => handleOverrideChange(dayKey, player, e.target.value)}
+                        placeholder="—"
+                        className="w-16 bg-slate-700 border border-amber-700/50 rounded-lg px-3 py-1.5 text-sm text-white text-right focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     </main>
