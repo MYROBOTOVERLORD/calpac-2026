@@ -303,6 +303,12 @@ export default function CalcuttaAdminPage() {
 					</div>
 					<div className="flex gap-2">
 						<button
+							onClick={() => router.push("/")}
+							className="bg-white hover:bg-sky-50 border border-sky-200 px-4 py-2 rounded-lg text-sm"
+						>
+							← Main Scoring
+						</button>
+						<button
 							onClick={() => router.push("/calcutta")}
 							className="bg-white hover:bg-sky-50 border border-sky-200 px-4 py-2 rounded-lg text-sm"
 						>

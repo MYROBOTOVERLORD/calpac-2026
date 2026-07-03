@@ -334,12 +334,20 @@ export default function CalcuttaScoringPage() {
 
         {/* ── Top Bar ── */}
         <div className="flex items-center justify-between px-4 pt-4 pb-1">
-          <button
-            onClick={() => router.push("/calcutta")}
-            className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors py-1"
-          >
-            ← Calcutta
-          </button>
+          <div className="flex flex-col gap-0.5">
+            <button
+              onClick={() => router.push("/calcutta")}
+              className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors py-0.5 text-left"
+            >
+              ← Calcutta
+            </button>
+            <button
+              onClick={() => router.push("/")}
+              className="text-xs text-zinc-600 hover:text-zinc-300 transition-colors py-0.5 text-left"
+            >
+              ← Main Scoring
+            </button>
+          </div>
           <span className="text-xs text-emerald-400 font-semibold truncate max-w-[180px] text-center">{teamDisplayName}</span>
           <div className="text-xs text-zinc-600 w-20 text-right">{saving ? "Saving…" : holesPlayed > 0 ? "Saved" : ""}</div>
         </div>
