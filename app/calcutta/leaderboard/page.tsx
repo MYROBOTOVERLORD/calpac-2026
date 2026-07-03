@@ -100,11 +100,11 @@ export default function CalcuttaLeaderboardPage() {
 		});
 
 		out.sort((a, b) => {
-			// Complete rounds first, sorted by net; then incomplete by holes played desc then gross
 			const aComplete = a.teamNet != null;
 			const bComplete = b.teamNet != null;
 			if (aComplete !== bComplete) return aComplete ? -1 : 1;
 			if (aComplete) return (a.teamNet! - b.teamNet!) || (a.teamGross! - b.teamGross!);
+			// Both incomplete: more holes played first, then lower gross
 			if (b.holesPlayed !== a.holesPlayed) return b.holesPlayed - a.holesPlayed;
 			const ag = a.teamGross ?? Number.POSITIVE_INFINITY;
 			const bg = b.teamGross ?? Number.POSITIVE_INFINITY;
@@ -183,17 +183,21 @@ export default function CalcuttaLeaderboardPage() {
 
 										{/* Score */}
 										<div className="text-right shrink-0">
-											{complete ? (
+											{r.holesPlayed > 0 ? (
 												<>
-													<p className="text-xs text-zinc-500">Net / Gross</p>
+													<p className="text-xs text-zinc-500">
+														{complete ? "Net / Gross" : `Thru ${r.holesPlayed}`}
+													</p>
 													<p className="text-base font-bold text-emerald-400">
-														{r.teamNet} / {r.teamGross}
+														{complete
+															? `${r.teamNet} / ${r.teamGross}`
+															: r.teamGross}
 													</p>
 												</>
 											) : (
 												<>
-													<p className="text-xs text-zinc-500">{r.holesPlayed > 0 ? "In progress" : "Not started"}</p>
-													<p className="text-sm font-bold text-zinc-500">{netDisplay}</p>
+													<p className="text-xs text-zinc-500">Not started</p>
+													<p className="text-sm font-bold text-zinc-500">—</p>
 												</>
 											)}
 										</div>

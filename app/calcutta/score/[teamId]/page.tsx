@@ -268,8 +268,9 @@ export default function CalcuttaScoringPage() {
           ? Math.floor(data.handicap)
           : Math.floor(safeNum(data.handicapA, 0)) + Math.floor(safeNum(data.handicapB, 0));
         const s = coerceScores(data.scores);
-        const gross = isComplete(s) ? arrSum(s) : null;
-        const net = gross == null ? null : gross - hcp;
+        const holesPlayed = s.filter((v) => typeof v === "number").length;
+        const gross = holesPlayed > 0 ? arrSum(s) : null;
+        const net = isComplete(s) && gross != null ? gross - hcp : null;
         const name = (data.teamName ?? "").trim() || `${data.playerA ?? "?"} / ${data.playerB ?? "?"}`;
         return { id, teamName: name, teamHandicap: hcp, teamGross: gross, teamNet: net };
       })
