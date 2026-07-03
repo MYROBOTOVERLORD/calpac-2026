@@ -16,6 +16,7 @@ type CalcuttaTeamDoc = {
 	teamName?: string;
 	playerA?: string;
 	playerB?: string;
+	handicap?: number;
 	handicapA?: number;
 	handicapB?: number;
 	scores?: Array<number | null>;
@@ -28,8 +29,6 @@ type TeamRow = {
 	teamName: string;
 	playerA: string;
 	playerB: string;
-	handicapA: number;
-	handicapB: number;
 	teamHandicap: number;
 	teamGross: number | null;
 	teamNet: number | null;
@@ -107,25 +106,15 @@ export default function CalcuttaPage() {
 		const out: TeamRow[] = teams.map(({ id, data }) => {
 			const playerA = (data.playerA ?? "").trim();
 			const playerB = (data.playerB ?? "").trim();
-			const handicapA = Math.floor(safeNum(data.handicapA, 0));
-			const handicapB = Math.floor(safeNum(data.handicapB, 0));
-			const teamHandicap = handicapA + handicapB;
+			const teamHandicap = typeof data.handicap === "number"
+				? Math.floor(data.handicap)
+				: Math.floor(safeNum(data.handicapA, 0)) + Math.floor(safeNum(data.handicapB, 0));
 			const scores = coerceScores(data.scores);
 			const complete = isCompleteRound(scores);
 			const teamGross = complete ? sumScores(scores) : null;
 			const teamNet = teamGross == null ? null : teamGross - teamHandicap;
 			const teamName = (data.teamName ?? "").trim() || `${playerA || "Player A"} / ${playerB || "Player B"}`;
-			return {
-				id,
-				teamName,
-				playerA: playerA || "—",
-				playerB: playerB || "—",
-				handicapA,
-				handicapB,
-				teamHandicap,
-				teamGross,
-				teamNet,
-			};
+			return { id, teamName, playerA: playerA || "—", playerB: playerB || "—", teamHandicap, teamGross, teamNet };
 		});
 
 		out.sort((a, b) => {
@@ -188,7 +177,7 @@ export default function CalcuttaPage() {
 									<span className={`text-sm font-bold w-5 shrink-0 ${idx === 0 ? "text-emerald-400" : "text-zinc-600"}`}>{idx + 1}</span>
 									<div className="flex-1 min-w-0">
 										<p className="font-semibold text-white">{r.teamName}</p>
-										<p className="text-xs text-zinc-500 mt-0.5">{r.playerA} ({r.handicapA}) · {r.playerB} ({r.handicapB}) · HCP {r.teamHandicap}</p>
+										<p className="text-xs text-zinc-500 mt-0.5">{r.playerA} · {r.playerB} · HCP {r.teamHandicap}</p>
 									</div>
 									<div className="text-right shrink-0">
 										<p className="text-xs text-zinc-600">Net</p>
@@ -206,7 +195,7 @@ export default function CalcuttaPage() {
 				)}
 
 				<p className="text-xs text-zinc-600 text-center">
-					Team Net = Gross − (HCP A + HCP B). Sorted by net score.
+					Team Net = Gross − Team HCP. Sorted by net score.
 				</p>
 			</div>
 		</main>
