@@ -807,30 +807,27 @@ export default function ScoringPage() {
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-white truncate">{player}</p>
                     <p className="text-xs text-zinc-500 mt-0.5">
-                      {holesPlayed > 0 ? (
+                      {gross !== null ? (
                         <>
-                          Thru {holesPlayed} ·{" "}
-                          <span className={diff < 0 ? "text-red-400" : diff === 0 ? "text-emerald-400" : "text-zinc-400"}>
-                            {diff === 0 ? "E" : diff > 0 ? `+${diff}` : diff}
-                          </span>
+                          <span>Gross {gross}</span>
+                          {holeStrokes > 0 && (
+                            <span className="text-zinc-400"> · Net {netHole}</span>
+                          )}
                         </>
                       ) : (
-                        <span className="text-zinc-600">No scores yet</span>
+                        <span className="text-zinc-600">No score yet</span>
                       )}
                     </p>
                   </div>
                   <div className="text-right">
-                    {holeStrokes > 0 ? (
-                      <>
-                        <p className="text-xs text-zinc-500">Net hole</p>
-                        <p className="text-sm font-bold">{netHole ?? "—"}</p>
-                      </>
-                    ) : (
-                      <>
-                        <p className="text-xs text-zinc-500">Total</p>
-                        <p className="text-lg font-bold">{rt || "—"}</p>
-                      </>
-                    )}
+                    <p className="text-xs text-zinc-500">Thru {holesPlayed || "—"}</p>
+                    <p className="text-sm font-bold">
+                      {holesPlayed > 0 ? (
+                        <span className={diff < 0 ? "text-red-400" : diff === 0 ? "text-emerald-400" : "text-zinc-300"}>
+                          {diff === 0 ? "E" : diff > 0 ? `+${diff}` : diff}
+                        </span>
+                      ) : "—"}
+                    </p>
                   </div>
                   <ScoreButton
                     value={gross}
