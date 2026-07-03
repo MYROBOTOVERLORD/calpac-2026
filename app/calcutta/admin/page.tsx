@@ -257,7 +257,9 @@ export default function CalcuttaAdminPage() {
 				teamName: (draft.teamName ?? "").trim(),
 				playerA: (draft.playerA ?? "").trim(),
 				playerB: (draft.playerB ?? "").trim(),
-				handicap: safeInt(draft.handicap),
+				handicap: typeof draft.handicap === "number"
+					? safeInt(draft.handicap)
+					: safeInt(draft.handicapA) + safeInt(draft.handicapB),
 				scores: coerceScores(draft.scores),
 				updatedAt: serverTimestamp() as any,
 			};
