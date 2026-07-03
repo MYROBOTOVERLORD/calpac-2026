@@ -434,7 +434,10 @@ export default function CalcuttaScoringPage() {
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-white truncate">{teamDisplayName}</p>
                   <p className="text-xs text-zinc-500 mt-0.5">
-                    {team.playerA} · {team.playerB} · Hdcp {teamHandicap}
+                    {team.playerA} · {team.playerB}
+                  </p>
+                  <p className="text-xs text-zinc-600 mt-0.5">
+                    Team HCP {teamHandicap} · Hole idx {hcpIndices[currentHole]}{holeStrokes > 0 ? ` · −${holeStrokes} stroke` : ""}
                   </p>
                   {holesPlayed > 0 && (
                     <p className="text-xs mt-1">
@@ -452,7 +455,7 @@ export default function CalcuttaScoringPage() {
                       <p className="text-lg font-bold">{holeGross ?? "—"}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-zinc-500">Net{holeStrokes > 0 ? ` (−${holeStrokes})` : ""}</p>
+                      <p className="text-xs text-zinc-500">Net</p>
                       <p className="text-lg font-bold text-emerald-400">{holeNet ?? "—"}</p>
                     </div>
                   </div>
