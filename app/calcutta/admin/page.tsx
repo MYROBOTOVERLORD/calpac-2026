@@ -27,6 +27,7 @@ type CalcuttaTeamDoc = {
 	teamName?: string;
 	playerA?: string;
 	playerB?: string;
+	handicap?: number;
 	handicapA?: number;
 	handicapB?: number;
 	scores?: Array<number | null>;
@@ -38,8 +39,7 @@ type TeamDraft = {
 	teamName: string;
 	playerA: string;
 	playerB: string;
-	handicapA: string;
-	handicapB: string;
+	handicap: string;
 };
 
 const EVENT_ID = "current";
@@ -111,8 +111,7 @@ export default function CalcuttaAdminPage() {
 		teamName: "",
 		playerA: "",
 		playerB: "",
-		handicapA: "0",
-		handicapB: "0",
+		handicap: "0",
 	});
 	const [addTeamError, setAddTeamError] = useState<string | null>(null);
 	const [addingTeam, setAddingTeam] = useState(false);
@@ -232,13 +231,12 @@ export default function CalcuttaAdminPage() {
 				teamName: newTeam.teamName.trim() || "",
 				playerA,
 				playerB,
-				handicapA: safeIntString(newTeam.handicapA),
-				handicapB: safeIntString(newTeam.handicapB),
+				handicap: safeIntString(newTeam.handicap),
 				scores: Array.from({ length: 18 }, () => null),
 				createdAt: serverTimestamp(),
 				updatedAt: serverTimestamp(),
 			});
-			setNewTeam({ teamName: "", playerA: "", playerB: "", handicapA: "0", handicapB: "0" });
+			setNewTeam({ teamName: "", playerA: "", playerB: "", handicap: "0" });
 		} catch (err) {
 			const message = err instanceof Error ? err.message : String(err);
 			setAddTeamError(message);
@@ -259,8 +257,7 @@ export default function CalcuttaAdminPage() {
 				teamName: (draft.teamName ?? "").trim(),
 				playerA: (draft.playerA ?? "").trim(),
 				playerB: (draft.playerB ?? "").trim(),
-				handicapA: safeInt(draft.handicapA),
-				handicapB: safeInt(draft.handicapB),
+				handicap: safeInt(draft.handicap),
 				scores: coerceScores(draft.scores),
 				updatedAt: serverTimestamp() as any,
 			};
@@ -427,20 +424,13 @@ export default function CalcuttaAdminPage() {
 							{addingTeam ? "Adding…" : "Add"}
 						</button>
 					</div>
-					<div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-2">
+					<div className="mt-2 grid grid-cols-2 sm:grid-cols-3 gap-2">
 						<input
-							value={newTeam.handicapA}
-							onChange={(e) => setNewTeam((p) => ({ ...p, handicapA: e.target.value }))}
+							value={newTeam.handicap}
+							onChange={(e) => setNewTeam((p) => ({ ...p, handicap: e.target.value }))}
 							inputMode="numeric"
 							className="p-2 bg-white border border-sky-200 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-sky-200"
-							placeholder="A HCP"
-						/>
-						<input
-							value={newTeam.handicapB}
-							onChange={(e) => setNewTeam((p) => ({ ...p, handicapB: e.target.value }))}
-							inputMode="numeric"
-							className="p-2 bg-white border border-sky-200 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-sky-200"
-							placeholder="B HCP"
+							placeholder="Team HCP"
 						/>
 						<div className="p-2 bg-sky-50 border border-sky-200 rounded-lg text-xs text-slate-700 flex items-center justify-center text-center">
 							Hole-by-hole scores are entered below.
@@ -463,9 +453,8 @@ export default function CalcuttaAdminPage() {
 								<tr className="text-left text-slate-700">
 									<th className="p-2">Team</th>
 									<th className="p-2">Player A</th>
-									<th className="p-2">A HCP</th>
 									<th className="p-2">Player B</th>
-									<th className="p-2">B HCP</th>
+									<th className="p-2">Team HCP</th>
 									<th className="p-2">Team Gross</th>
 									<th className="p-2">Team Net</th>
 									<th className="p-2"></th>
@@ -477,12 +466,13 @@ export default function CalcuttaAdminPage() {
 									const teamName = data.teamName ?? "";
 									const playerA = data.playerA ?? "";
 									const playerB = data.playerB ?? "";
-									const handicapA = String(Math.floor(typeof data.handicapA === "number" ? data.handicapA : 0));
-									const handicapB = String(Math.floor(typeof data.handicapB === "number" ? data.handicapB : 0));
+									// Fall back to sum of legacy per-player handicaps if new field not set
+									const teamHcp = typeof data.handicap === "number" ? data.handicap : (safeInt(data.handicapA) + safeInt(data.handicapB));
+									const handicapStr = String(Math.floor(teamHcp));
 									const scores = coerceScores(data.scores);
 									const complete = isCompleteRound(scores);
 									const teamGross = complete ? sumScores(scores) : null;
-									const teamNet = teamGross == null ? null : teamGross - (safeInt(data.handicapA) + safeInt(data.handicapB));
+									const teamNet = teamGross == null ? null : teamGross - teamHcp;
 
 									return (
 										<>
@@ -507,15 +497,6 @@ export default function CalcuttaAdminPage() {
 											</td>
 											<td className="p-2">
 												<input
-													defaultValue={handicapA}
-													disabled={disabled}
-													inputMode="numeric"
-													className="w-20 p-2 text-center bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200 disabled:opacity-60"
-													onBlur={(e) => saveTeam(id, { ...data, handicapA: safeIntString(e.target.value) })}
-												/>
-											</td>
-											<td className="p-2">
-												<input
 													defaultValue={playerB}
 													disabled={disabled}
 													className="w-48 p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200 disabled:opacity-60"
@@ -525,11 +506,11 @@ export default function CalcuttaAdminPage() {
 											</td>
 											<td className="p-2">
 												<input
-													defaultValue={handicapB}
+													defaultValue={handicapStr}
 													disabled={disabled}
 													inputMode="numeric"
 													className="w-20 p-2 text-center bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200 disabled:opacity-60"
-													onBlur={(e) => saveTeam(id, { ...data, handicapB: safeIntString(e.target.value) })}
+													onBlur={(e) => saveTeam(id, { ...data, handicap: safeIntString(e.target.value) })}
 												/>
 											</td>
 											<td className="p-2 text-slate-800 whitespace-nowrap">{teamGross == null ? "—" : teamGross}</td>
@@ -545,7 +526,7 @@ export default function CalcuttaAdminPage() {
 											</td>
 											</tr>
 											<tr className="border-t border-sky-100">
-											<td className="p-2" colSpan={8}>
+											<td className="p-2" colSpan={7}>
 												<div className="text-xs text-slate-600 mb-2">Hole scores (best ball: enter 1 score per hole)</div>
 												<div className="overflow-x-auto">
 													<div className="min-w-[820px] flex gap-1">

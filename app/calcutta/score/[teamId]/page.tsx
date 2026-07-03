@@ -12,6 +12,7 @@ type CalcuttaTeamDoc = {
   teamName?: string;
   playerA?: string;
   playerB?: string;
+  handicap?: number;
   handicapA?: number;
   handicapB?: number;
   scores?: Array<number | null>;
@@ -248,7 +249,10 @@ export default function CalcuttaScoringPage() {
 
   const teamHandicap = useMemo(() => {
     if (!team) return 0;
-    return Math.floor(safeNum(team.handicapA, 0)) + Math.floor(safeNum(team.handicapB, 0));
+    // Use new single team handicap; fall back to sum of legacy per-player fields
+    return typeof team.handicap === "number"
+      ? Math.floor(team.handicap)
+      : Math.floor(safeNum(team.handicapA, 0)) + Math.floor(safeNum(team.handicapB, 0));
   }, [team]);
 
   const teamGross = arrSum(scores);
@@ -260,9 +264,9 @@ export default function CalcuttaScoringPage() {
   const leaderboard = useMemo((): TeamLeaderRow[] => {
     return allTeams
       .map(({ id, data }) => {
-        const hcpA = Math.floor(safeNum(data.handicapA, 0));
-        const hcpB = Math.floor(safeNum(data.handicapB, 0));
-        const hcp = hcpA + hcpB;
+        const hcp = typeof data.handicap === "number"
+          ? Math.floor(data.handicap)
+          : Math.floor(safeNum(data.handicapA, 0)) + Math.floor(safeNum(data.handicapB, 0));
         const s = coerceScores(data.scores);
         const gross = isComplete(s) ? arrSum(s) : null;
         const net = gross == null ? null : gross - hcp;
@@ -400,7 +404,7 @@ export default function CalcuttaScoringPage() {
             <div className="flex-1 min-w-0">
               <p className="font-semibold text-white truncate">{teamDisplayName}</p>
               <p className="text-xs text-zinc-500 mt-0.5">
-                {team.playerA} ({Math.floor(safeNum(team.handicapA, 0))}) · {team.playerB} ({Math.floor(safeNum(team.handicapB, 0))})
+                {team.playerA} · {team.playerB} · Hdcp {teamHandicap}
               </p>
               {holesPlayed > 0 && (
                 <p className="text-xs mt-1">
