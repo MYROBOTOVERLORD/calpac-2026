@@ -176,9 +176,10 @@ export default function CalcuttaLeaderboardPage() {
 										{/* Team info */}
 										<div className="flex-1 min-w-0">
 											<p className="font-semibold text-white truncate">{r.teamName}</p>
-											<p className="text-xs text-zinc-500 mt-0.5">
-												{r.playerA} · {r.playerB} · HCP {r.teamHandicap}
+											<p className="text-xs text-zinc-500 mt-0.5 truncate">
+												{r.playerA} · {r.playerB}
 											</p>
+											<p className="text-[10px] text-zinc-600 mt-0.5">HCP {r.teamHandicap}</p>
 										</div>
 
 										{/* Score */}

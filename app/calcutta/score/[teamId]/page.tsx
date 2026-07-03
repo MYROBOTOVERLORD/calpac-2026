@@ -26,6 +26,8 @@ type CalcuttaEventDoc = {
 type TeamLeaderRow = {
   id: string;
   teamName: string;
+  playerA: string;
+  playerB: string;
   teamHandicap: number;
   teamGross: number | null;
   teamNet: number | null;
@@ -81,6 +83,10 @@ function getScoreColor(score: number | null, par: number): string {
 function fmtNet(net: number | null) {
   if (net === null) return "—";
   return net === 0 ? "E" : net < 0 ? String(net) : `+${net}`;
+}
+
+function strokesOnHole(teamHandicap: number, holeHandicap: number): number {
+  return Math.max(0, Math.floor((teamHandicap + 18 - holeHandicap) / 18));
 }
 
 // ─── Green Popup ──────────────────────────────────────────────────────────────
@@ -272,7 +278,7 @@ export default function CalcuttaScoringPage() {
         const gross = holesPlayed > 0 ? arrSum(s) : null;
         const net = isComplete(s) && gross != null ? gross - hcp : null;
         const name = (data.teamName ?? "").trim() || `${data.playerA ?? "?"} / ${data.playerB ?? "?"}`;
-        return { id, teamName: name, teamHandicap: hcp, teamGross: gross, teamNet: net };
+        return { id, teamName: name, playerA: (data.playerA ?? "").trim(), playerB: (data.playerB ?? "").trim(), teamHandicap: hcp, teamGross: gross, teamNet: net };
       })
       .sort((a, b) => {
         const an = a.teamNet ?? Infinity;
@@ -400,33 +406,48 @@ export default function CalcuttaScoringPage() {
         </div>
 
         {/* ── Score Input ── */}
-        <div className="px-4 pt-5 pb-2">
-          <div className="bg-zinc-900 rounded-2xl px-4 py-4 flex items-center gap-4">
-            <div className="flex-1 min-w-0">
-              <p className="font-semibold text-white truncate">{teamDisplayName}</p>
-              <p className="text-xs text-zinc-500 mt-0.5">
-                {team.playerA} · {team.playerB} · Hdcp {teamHandicap}
-              </p>
-              {holesPlayed > 0 && (
-                <p className="text-xs mt-1">
-                  <span className="text-zinc-500">Thru {holesPlayed} · </span>
-                  <span className={diffThrough < 0 ? "text-red-400 font-semibold" : diffThrough === 0 ? "text-emerald-400 font-semibold" : "text-zinc-400 font-semibold"}>
-                    {diffThrough === 0 ? "E" : diffThrough > 0 ? `+${diffThrough}` : diffThrough}
-                  </span>
-                </p>
-              )}
+        {(() => {
+          const holeStrokes = strokesOnHole(teamHandicap, hole.handicap);
+          const holeGross = scores[currentHole] ?? null;
+          const holeNet = holeGross !== null ? holeGross - holeStrokes : null;
+          return (
+            <div className="px-4 pt-5 pb-2">
+              <div className="bg-zinc-900 rounded-2xl px-4 py-4 flex items-center gap-4">
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-white truncate">{teamDisplayName}</p>
+                  <p className="text-xs text-zinc-500 mt-0.5">
+                    {team.playerA} · {team.playerB} · Hdcp {teamHandicap}
+                  </p>
+                  {holesPlayed > 0 && (
+                    <p className="text-xs mt-1">
+                      <span className="text-zinc-500">Thru {holesPlayed} · </span>
+                      <span className={diffThrough < 0 ? "text-red-400 font-semibold" : diffThrough === 0 ? "text-emerald-400 font-semibold" : "text-zinc-400 font-semibold"}>
+                        {diffThrough === 0 ? "E" : diffThrough > 0 ? `+${diffThrough}` : diffThrough}
+                      </span>
+                    </p>
+                  )}
+                </div>
+                <div className="text-right mr-2 shrink-0">
+                  <div className="flex gap-3">
+                    <div>
+                      <p className="text-xs text-zinc-500">Gross</p>
+                      <p className="text-lg font-bold">{holeGross ?? "—"}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-zinc-500">Net{holeStrokes > 0 ? ` (−${holeStrokes})` : ""}</p>
+                      <p className="text-lg font-bold text-emerald-400">{holeNet ?? "—"}</p>
+                    </div>
+                  </div>
+                </div>
+                <ScoreButton
+                  value={scores[currentHole] ?? null}
+                  par={hole.par}
+                  onChange={(v) => handleScoreChange(currentHole, v)}
+                />
+              </div>
             </div>
-            <div className="text-right mr-2">
-              <p className="text-xs text-zinc-500">Gross</p>
-              <p className="text-lg font-bold">{teamGross || "—"}</p>
-            </div>
-            <ScoreButton
-              value={scores[currentHole] ?? null}
-              par={hole.par}
-              onChange={(v) => handleScoreChange(currentHole, v)}
-            />
-          </div>
-        </div>
+          );
+        })()}
 
         {/* ── Navigation ── */}
         <div className="px-4 py-4 border-t border-zinc-800 mt-3">
@@ -510,7 +531,12 @@ export default function CalcuttaScoringPage() {
                     }`}
                   >
                     <span className={`text-sm font-bold w-5 shrink-0 ${i === 0 ? "text-emerald-400" : "text-zinc-500"}`}>{i + 1}</span>
-                    <span className={`flex-1 text-sm font-semibold truncate ${isThis ? "text-emerald-300" : "text-white"}`}>{r.teamName}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm font-semibold truncate ${isThis ? "text-emerald-300" : "text-white"}`}>{r.teamName}</p>
+                      {(r.playerA || r.playerB) && (
+                        <p className="text-[10px] text-zinc-500 truncate">{r.playerA} · {r.playerB}</p>
+                      )}
+                    </div>
                     <span className="text-sm text-zinc-400 w-12 text-right shrink-0">{r.teamGross ?? "—"}</span>
                     <span className="text-sm font-bold text-white w-12 text-right shrink-0">
                       {r.teamNet ?? "—"}
