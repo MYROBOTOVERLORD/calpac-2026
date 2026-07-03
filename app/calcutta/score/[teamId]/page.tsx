@@ -31,6 +31,7 @@ type TeamLeaderRow = {
   teamHandicap: number;
   teamGross: number | null;
   teamNet: number | null;
+  runningNet: number | null;
 };
 
 const EVENT_ID = "current";
@@ -277,17 +278,24 @@ export default function CalcuttaScoringPage() {
         const holesPlayed = s.filter((v) => typeof v === "number").length;
         const gross = holesPlayed > 0 ? arrSum(s) : null;
         const net = isComplete(s) && gross != null ? gross - hcp : null;
+        let runningStrokes = 0;
+        for (let i = 0; i < HOLE_COUNT; i++) {
+          if (s[i] != null) runningStrokes += strokesOnHole(hcp, course.holes[i].handicap);
+        }
+        const runningNet = holesPlayed > 0 ? (gross ?? 0) - runningStrokes : null;
         const name = (data.teamName ?? "").trim() || `${data.playerA ?? "?"} / ${data.playerB ?? "?"}`;
-        return { id, teamName: name, playerA: (data.playerA ?? "").trim(), playerB: (data.playerB ?? "").trim(), teamHandicap: hcp, teamGross: gross, teamNet: net };
+        return { id, teamName: name, playerA: (data.playerA ?? "").trim(), playerB: (data.playerB ?? "").trim(), teamHandicap: hcp, teamGross: gross, teamNet: net, runningNet };
       })
       .sort((a, b) => {
         const an = a.teamNet ?? Infinity;
         const bn = b.teamNet ?? Infinity;
         const ag = a.teamGross ?? Infinity;
         const bg = b.teamGross ?? Infinity;
-        return an - bn || ag - bg || a.teamName.localeCompare(b.teamName);
+        const arn = a.runningNet ?? Infinity;
+        const brn = b.runningNet ?? Infinity;
+        return an - bn || arn - brn || ag - bg || a.teamName.localeCompare(b.teamName);
       });
-  }, [allTeams]);
+  }, [allTeams, course]);
 
   function scheduleSave(next: Array<number | null>) {
     if (!teamId) return;
@@ -544,8 +552,8 @@ export default function CalcuttaScoringPage() {
                       )}
                     </div>
                     <span className="text-sm text-zinc-400 w-12 text-right shrink-0">{r.teamGross ?? "—"}</span>
-                    <span className="text-sm font-bold text-white w-12 text-right shrink-0">
-                      {r.teamNet ?? "—"}
+                    <span className="text-sm font-bold text-emerald-400 w-12 text-right shrink-0">
+                      {r.teamNet ?? r.runningNet ?? "—"}
                     </span>
                   </button>
                 );
