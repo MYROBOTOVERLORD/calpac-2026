@@ -498,12 +498,18 @@ export default function CalcuttaScoringPage() {
             </div>
             <div className="text-right">
               <p className="text-xs text-zinc-500">Gross</p>
-              <p className="text-base font-bold text-white">{isComplete(scores) ? teamGross : "—"}</p>
+              <p className="text-base font-bold text-white">{holesPlayed > 0 ? teamGross : "—"}</p>
             </div>
             <div className="text-right">
               <p className="text-xs text-zinc-500">Net</p>
               <p className="text-base font-bold text-emerald-400">
-                {isComplete(scores) ? teamGross - teamHandicap : "—"}
+                {holesPlayed > 0 ? (() => {
+                  let strokes = 0;
+                  for (let i = 0; i < HOLE_COUNT; i++) {
+                    if (scores[i] != null) strokes += strokesOnHole(teamHandicap, course.holes[i].handicap);
+                  }
+                  return teamGross - strokes;
+                })() : "—"}
               </p>
             </div>
           </div>

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { collection, doc, onSnapshot, type Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { COURSES, HILLS, type CourseData } from "@/lib/courses";
 
 type CalcuttaEventDoc = {
 	name?: string;
@@ -30,8 +31,10 @@ type TeamRow = {
 	playerA: string;
 	playerB: string;
 	teamHandicap: number;
+	holesPlayed: number;
 	teamGross: number | null;
 	teamNet: number | null;
+	runningNet: number | null;
 };
 
 const EVENT_ID = "current";
@@ -48,16 +51,16 @@ function coerceScores(input: unknown) {
 	});
 }
 
-function isCompleteRound(scores: Array<number | null>) {
-	return scores.length === 18 && scores.every((s) => typeof s === "number" && Number.isFinite(s));
+function sumScores(scores: Array<number | null>) {
+	let total = 0, count = 0;
+	for (const s of scores) {
+		if (typeof s === "number" && Number.isFinite(s)) { total += s; count++; }
+	}
+	return { total, count };
 }
 
-function sumScores(scores: Array<number | null>) {
-	let total = 0;
-	for (const s of scores) {
-		if (typeof s === "number" && Number.isFinite(s)) total += s;
-	}
-	return total;
+function strokesOnHole(teamHandicap: number, holeHandicap: number): number {
+	return Math.max(0, Math.floor((teamHandicap + 18 - holeHandicap) / 18));
 }
 
 export default function CalcuttaPage() {
@@ -102,6 +105,10 @@ export default function CalcuttaPage() {
 		};
 	}, []);
 
+	const course: CourseData = useMemo(() => {
+		return COURSES[event?.course ?? "hills"] ?? HILLS;
+	}, [event?.course]);
+
 	const rows = useMemo(() => {
 		const out: TeamRow[] = teams.map(({ id, data }) => {
 			const playerA = (data.playerA ?? "").trim();
@@ -110,25 +117,33 @@ export default function CalcuttaPage() {
 				? Math.floor(data.handicap)
 				: Math.floor(safeNum(data.handicapA, 0)) + Math.floor(safeNum(data.handicapB, 0));
 			const scores = coerceScores(data.scores);
-			const complete = isCompleteRound(scores);
-			const teamGross = complete ? sumScores(scores) : null;
-			const teamNet = teamGross == null ? null : teamGross - teamHandicap;
+			const { total: gross, count: holesPlayed } = sumScores(scores);
+			const teamGross = holesPlayed > 0 ? gross : null;
+			const complete = holesPlayed === 18;
+			const teamNet = complete && teamGross != null ? teamGross - teamHandicap : null;
+			let runningStrokes = 0;
+			for (let i = 0; i < 18; i++) {
+				if (scores[i] != null) runningStrokes += strokesOnHole(teamHandicap, course.holes[i].handicap);
+			}
+			const runningNet = holesPlayed > 0 ? gross - runningStrokes : null;
 			const teamName = (data.teamName ?? "").trim() || `${playerA || "Player A"} / ${playerB || "Player B"}`;
-			return { id, teamName, playerA: playerA || "—", playerB: playerB || "—", teamHandicap, teamGross, teamNet };
+			return { id, teamName, playerA: playerA || "—", playerB: playerB || "—", teamHandicap, holesPlayed, teamGross, teamNet, runningNet };
 		});
 
 		out.sort((a, b) => {
-			const an = a.teamNet == null ? Number.POSITIVE_INFINITY : a.teamNet;
-			const bn = b.teamNet == null ? Number.POSITIVE_INFINITY : b.teamNet;
-			const ag = a.teamGross == null ? Number.POSITIVE_INFINITY : a.teamGross;
-			const bg = b.teamGross == null ? Number.POSITIVE_INFINITY : b.teamGross;
+			const aComplete = a.teamNet != null;
+			const bComplete = b.teamNet != null;
+			if (aComplete !== bComplete) return aComplete ? -1 : 1;
+			if (aComplete) return (a.teamNet! - b.teamNet!) || (a.teamGross! - b.teamGross!);
+			if (b.holesPlayed !== a.holesPlayed) return b.holesPlayed - a.holesPlayed;
+			const an = a.runningNet ?? Number.POSITIVE_INFINITY;
+			const bn = b.runningNet ?? Number.POSITIVE_INFINITY;
 			const numA = parseInt(a.teamName.replace(/\D/g, ""), 10);
 			const numB = parseInt(b.teamName.replace(/\D/g, ""), 10);
-			const numCmp = !isNaN(numA) && !isNaN(numB) ? numA - numB : a.teamName.localeCompare(b.teamName);
-			return an - bn || ag - bg || numCmp;
+			return an - bn || (!isNaN(numA) && !isNaN(numB) ? numA - numB : a.teamName.localeCompare(b.teamName));
 		});
 		return out;
-	}, [teams]);
+	}, [teams, course]);
 
 	if (loading) return <main className="min-h-screen bg-zinc-950 text-white p-3 sm:p-6 flex items-center justify-center"><div className="text-zinc-400 text-sm">Loading…</div></main>;
 	if (error) return <main className="min-h-screen bg-zinc-950 text-white p-3 sm:p-6 flex items-center justify-center"><div className="text-red-400 text-sm">{error}</div></main>;
@@ -180,8 +195,16 @@ export default function CalcuttaPage() {
 										<p className="text-xs text-zinc-500 mt-0.5">{r.playerA} · {r.playerB} · HCP {r.teamHandicap}</p>
 									</div>
 									<div className="text-right shrink-0">
-										<p className="text-xs text-zinc-600">Net</p>
-										<p className="text-base font-bold text-emerald-400">{r.teamNet == null ? "—" : r.teamNet}</p>
+										<p className="text-xs text-zinc-600">
+											{r.holesPlayed > 0 ? (r.teamNet != null ? "Gross / Net" : `Thru ${r.holesPlayed}`) : "Net"}
+										</p>
+										<p className="text-base font-bold text-emerald-400">
+											{r.teamNet != null
+												? `${r.teamGross} / ${r.teamNet}`
+												: r.runningNet != null
+													? `${r.teamGross} / ${r.runningNet}`
+													: "—"}
+										</p>
 									</div>
 									<span className="text-zinc-600 ml-1">→</span>
 								</div>
