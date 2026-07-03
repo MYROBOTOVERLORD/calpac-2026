@@ -126,16 +126,6 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Michigan Tournament Banner */}
-        <button
-          onClick={() => router.push("/michigan")}
-          className="w-full mb-5 bg-gradient-to-r from-blue-700 to-blue-500 rounded-2xl px-5 py-4 text-left hover:from-blue-600 hover:to-blue-400 transition-all active:scale-[0.99] shadow-md"
-        >
-          <p className="text-[10px] font-bold tracking-widest text-blue-200 uppercase mb-0.5">June 15–19 · Michigan</p>
-          <p className="text-lg font-bold text-white">Michigan Golf Trip 2026</p>
-          <p className="text-xs text-blue-200 mt-0.5">Spruce Run · The Bear · Arcadia Bluffs · Bay Harbor · Forest Dunes → tap to score</p>
-        </button>
-
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
