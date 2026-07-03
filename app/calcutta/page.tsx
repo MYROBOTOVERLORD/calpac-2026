@@ -9,6 +9,7 @@ import { COURSES, HILLS, type CourseData } from "@/lib/courses";
 type CalcuttaEventDoc = {
 	name?: string;
 	course?: string;
+	hcpIndices?: number[];
 	createdAt?: Timestamp;
 	updatedAt?: Timestamp;
 };
@@ -59,8 +60,11 @@ function sumScores(scores: Array<number | null>) {
 	return { total, count };
 }
 
-function strokesOnHole(teamHandicap: number, holeHandicap: number): number {
-	return Math.max(0, Math.floor((teamHandicap + 18 - holeHandicap) / 18));
+function strokesForHole(idx: number, total: number): number {
+	const s = Math.floor(total);
+	if (!Number.isFinite(idx) || idx < 1 || idx > 18 || s <= 0) return 0;
+	if (s < idx) return 0;
+	return 1 + Math.floor((s - idx) / 18);
 }
 
 export default function CalcuttaPage() {
@@ -109,6 +113,12 @@ export default function CalcuttaPage() {
 		return COURSES[event?.course ?? "hills"] ?? HILLS;
 	}, [event?.course]);
 
+	const hcpIndices: number[] = useMemo(() => {
+		const stored = event?.hcpIndices;
+		if (Array.isArray(stored) && stored.length === 18) return stored;
+		return course.holes.map((h) => h.handicap);
+	}, [event?.hcpIndices, course]);
+
 	const rows = useMemo(() => {
 		const out: TeamRow[] = teams.map(({ id, data }) => {
 			const playerA = (data.playerA ?? "").trim();
@@ -123,7 +133,7 @@ export default function CalcuttaPage() {
 			const teamNet = complete && teamGross != null ? teamGross - teamHandicap : null;
 			let runningStrokes = 0;
 			for (let i = 0; i < 18; i++) {
-				if (scores[i] != null) runningStrokes += strokesOnHole(teamHandicap, course.holes[i].handicap);
+				if (scores[i] != null) runningStrokes += strokesForHole(hcpIndices[i], teamHandicap);
 			}
 			const runningNet = holesPlayed > 0 ? gross - runningStrokes : null;
 			const teamName = (data.teamName ?? "").trim() || `${playerA || "Player A"} / ${playerB || "Player B"}`;
@@ -143,7 +153,7 @@ export default function CalcuttaPage() {
 			return an - bn || (!isNaN(numA) && !isNaN(numB) ? numA - numB : a.teamName.localeCompare(b.teamName));
 		});
 		return out;
-	}, [teams, course]);
+	}, [teams, hcpIndices]);
 
 	if (loading) return <main className="min-h-screen bg-zinc-950 text-white p-3 sm:p-6 flex items-center justify-center"><div className="text-zinc-400 text-sm">Loading…</div></main>;
 	if (error) return <main className="min-h-screen bg-zinc-950 text-white p-3 sm:p-6 flex items-center justify-center"><div className="text-red-400 text-sm">{error}</div></main>;

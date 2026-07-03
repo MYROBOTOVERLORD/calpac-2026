@@ -19,6 +19,7 @@ import { COURSES } from "@/lib/courses";
 type CalcuttaEventDoc = {
 	name?: string;
 	course?: string;
+	hcpIndices?: number[];
 	createdAt?: Timestamp;
 	updatedAt?: Timestamp;
 };
@@ -104,6 +105,7 @@ export default function CalcuttaAdminPage() {
 
 	const [eventNameDraft, setEventNameDraft] = useState("Calcutta");
 	const [courseDraft, setCourseDraft] = useState("hills");
+	const [hcpIndicesDraft, setHcpIndicesDraft] = useState("");
 	const [eventSaveError, setEventSaveError] = useState<string | null>(null);
 	const [eventSaving, setEventSaving] = useState(false);
 
@@ -138,6 +140,14 @@ export default function CalcuttaAdminPage() {
 					setEvent(data);
 					if (eventNameDraft === "Calcutta" && (data.name ?? "").trim()) setEventNameDraft(data.name ?? "Calcutta");
 					if (!courseDraft && (data.course ?? "").trim()) setCourseDraft(data.course ?? "");
+					if (!hcpIndicesDraft) {
+						if (Array.isArray(data.hcpIndices) && data.hcpIndices.length === 18) {
+							setHcpIndicesDraft(data.hcpIndices.join(","));
+						} else {
+							const c = COURSES[data.course ?? "hills"];
+							if (c) setHcpIndicesDraft(c.holes.map((h) => h.handicap).join(","));
+						}
+					}
 				} else {
 					setEvent(null);
 				}
@@ -194,11 +204,15 @@ export default function CalcuttaAdminPage() {
 		setEventSaveError(null);
 		try {
 			const ref = doc(db, "calcuttaEvents", EVENT_ID);
+			const parsedHcps = hcpIndicesDraft.trim()
+				? hcpIndicesDraft.split(",").map((v) => Math.floor(Number(v.trim()))).filter((n) => Number.isFinite(n) && n >= 1 && n <= 18)
+				: null;
 			await setDoc(
 				ref,
 				{
 					name: eventNameDraft.trim() || "Calcutta",
 					course: courseDraft.trim() || "",
+					...(parsedHcps && parsedHcps.length === 18 ? { hcpIndices: parsedHcps } : {}),
 					...(event ? {} : { createdAt: serverTimestamp() }),
 					updatedAt: serverTimestamp(),
 				},
@@ -382,13 +396,47 @@ export default function CalcuttaAdminPage() {
 						/>
 					<select
 						value={courseDraft}
-						onChange={(e) => setCourseDraft(e.target.value)}
+						onChange={(e) => {
+							setCourseDraft(e.target.value);
+							const c = COURSES[e.target.value];
+							if (c) setHcpIndicesDraft(c.holes.map((h) => h.handicap).join(","));
+						}}
 						className="p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
 					>
 						{Object.values(COURSES).map((c) => (
 							<option key={c.id} value={c.id}>{c.name}</option>
 						))}
 					</select>
+					</div>
+
+					<div className="mt-3">
+						<p className="text-xs font-semibold text-slate-500 mb-1">Hole Handicap Indices (comma-separated, holes 1–18)</p>
+						<input
+							value={hcpIndicesDraft}
+							onChange={(e) => setHcpIndicesDraft(e.target.value)}
+							className="w-full p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200 font-mono text-sm"
+							placeholder="e.g. 7,1,13,11,5,3,15,17,9,2,16,6,8,4,12,18,14,10"
+						/>
+						{hcpIndicesDraft.trim() && (() => {
+							const idxs = hcpIndicesDraft.split(",").map((v) => Number(v.trim()));
+							return (
+								<div className="mt-2 overflow-x-auto">
+									<table className="text-xs text-center border-collapse">
+										<thead>
+											<tr>
+												{idxs.map((_, i) => <th key={i} className="px-2 py-1 border border-sky-200 bg-sky-50 font-semibold text-slate-600">H{i + 1}</th>)}
+											</tr>
+										</thead>
+										<tbody>
+											<tr>
+												{idxs.map((v, i) => <td key={i} className="px-2 py-1 border border-sky-200 font-mono text-slate-700">{Number.isFinite(v) ? v : "?"}</td>)}
+											</tr>
+										</tbody>
+									</table>
+									{idxs.length !== 18 && <p className="text-red-500 text-xs mt-1">Need exactly 18 values (have {idxs.length})</p>}
+								</div>
+							);
+						})()}
 					</div>
 
 					{eventSaveError ? <p className="text-sm text-red-600 mt-2">{eventSaveError}</p> : null}

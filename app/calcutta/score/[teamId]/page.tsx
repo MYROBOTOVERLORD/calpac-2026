@@ -21,6 +21,7 @@ type CalcuttaTeamDoc = {
 type CalcuttaEventDoc = {
   name?: string;
   course?: string;
+  hcpIndices?: number[];
 };
 
 type TeamLeaderRow = {
@@ -86,8 +87,11 @@ function fmtNet(net: number | null) {
   return net === 0 ? "E" : net < 0 ? String(net) : `+${net}`;
 }
 
-function strokesOnHole(teamHandicap: number, holeHandicap: number): number {
-  return Math.max(0, Math.floor((teamHandicap + 18 - holeHandicap) / 18));
+function strokesForHole(idx: number, total: number): number {
+  const s = Math.floor(total);
+  if (!Number.isFinite(idx) || idx < 1 || idx > 18 || s <= 0) return 0;
+  if (s < idx) return 0;
+  return 1 + Math.floor((s - idx) / 18);
 }
 
 // ─── Green Popup ──────────────────────────────────────────────────────────────
@@ -252,6 +256,12 @@ export default function CalcuttaScoringPage() {
     return COURSES[courseId] ?? HILLS;
   }, [event?.course]);
 
+  const hcpIndices: number[] = useMemo(() => {
+    const stored = event?.hcpIndices;
+    if (Array.isArray(stored) && stored.length === 18) return stored;
+    return course.holes.map((h) => h.handicap);
+  }, [event?.hcpIndices, course]);
+
   const hole: HoleData = course.holes[currentHole];
 
   const teamHandicap = useMemo(() => {
@@ -280,7 +290,7 @@ export default function CalcuttaScoringPage() {
         const net = isComplete(s) && gross != null ? gross - hcp : null;
         let runningStrokes = 0;
         for (let i = 0; i < HOLE_COUNT; i++) {
-          if (s[i] != null) runningStrokes += strokesOnHole(hcp, course.holes[i].handicap);
+          if (s[i] != null) runningStrokes += strokesForHole(hcpIndices[i], hcp);
         }
         const runningNet = holesPlayed > 0 ? (gross ?? 0) - runningStrokes : null;
         const name = (data.teamName ?? "").trim() || `${data.playerA ?? "?"} / ${data.playerB ?? "?"}`;
@@ -415,7 +425,7 @@ export default function CalcuttaScoringPage() {
 
         {/* ── Score Input ── */}
         {(() => {
-          const holeStrokes = strokesOnHole(teamHandicap, hole.handicap);
+          const holeStrokes = strokesForHole(hcpIndices[currentHole], teamHandicap);
           const holeGross = scores[currentHole] ?? null;
           const holeNet = holeGross !== null ? holeGross - holeStrokes : null;
           return (
@@ -514,7 +524,7 @@ export default function CalcuttaScoringPage() {
                 {holesPlayed > 0 ? (() => {
                   let strokes = 0;
                   for (let i = 0; i < HOLE_COUNT; i++) {
-                    if (scores[i] != null) strokes += strokesOnHole(teamHandicap, course.holes[i].handicap);
+                    if (scores[i] != null) strokes += strokesForHole(hcpIndices[i], teamHandicap);
                   }
                   return teamGross - strokes;
                 })() : "—"}
