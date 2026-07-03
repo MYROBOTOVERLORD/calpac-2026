@@ -274,9 +274,8 @@ export default function CalcuttaScoringPage() {
 
   const teamGross = arrSum(scores);
   const holesPlayed = scores.filter((v) => typeof v === "number").length;
-  const parThrough = course.holes.slice(0, currentHole + 1).reduce((a, h) => a + h.par, 0);
-  const grossThrough = arrSum(scores.slice(0, currentHole + 1));
-  const diffThrough = grossThrough - parThrough;
+  const parThrough = course.holes.reduce<number>((a, h, i) => scores[i] != null ? a + h.par : a, 0);
+  const diffThrough = holesPlayed > 0 ? teamGross - parThrough : 0;
 
   const leaderboard = useMemo((): TeamLeaderRow[] => {
     return allTeams
