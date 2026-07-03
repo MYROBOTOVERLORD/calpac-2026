@@ -95,35 +95,37 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-sky-50 text-slate-900">
-      <div className="max-w-lg mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-5">
-          <div>
-            <h1 className="text-2xl font-bold">Cal-Pac 2026</h1>
-            <p className="text-slate-500 text-sm mt-0.5">Select your name to start scoring</p>
+      <div className="max-w-lg mx-auto px-4 py-6">
+        {/* Logo + Title banner */}
+        <div className="flex items-center gap-3 mb-4">
+          <img src="/calp-logo.svg" alt="Cal-Pac logo" className="w-14 h-14 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <h1 className="text-2xl font-extrabold tracking-tight leading-tight text-sky-800 whitespace-nowrap">Cal-Pacific 2026</h1>
+            <p className="text-slate-500 text-xs mt-0.5">Golf Classic · Select your name to score</p>
           </div>
-          <div className="flex gap-2 shrink-0 flex-wrap justify-end">
-            <button
-              onClick={() => router.push("/leaderboard")}
-              className="bg-white border border-sky-200 rounded-xl px-3 py-2 text-sm font-semibold text-sky-700 hover:bg-sky-50 transition-colors"
-            >
-              🏆 Leaderboard
-            </button>
-            <button
-              onClick={() => router.push("/calcutta")}
-              className="bg-white border border-sky-200 rounded-xl px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-sky-50 transition-colors"
-            >
-              🤑 Calcutta
-            </button>
-            <button
-              onClick={() => {
-                const gid = players.find((p) => p.day1GroupId)?.day1GroupId ?? "";
-                router.push(`/group/${gid}/admin`);
-              }}
-              className="bg-white border border-sky-200 rounded-xl px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-sky-50 transition-colors"
-            >
-              ⚙️ Admin
-            </button>
-          </div>
+        </div>
+        <div className="flex gap-2 mb-5 flex-wrap">
+          <button
+            onClick={() => router.push("/leaderboard")}
+            className="bg-white border border-sky-200 rounded-xl px-3 py-2 text-sm font-semibold text-sky-700 hover:bg-sky-50 transition-colors"
+          >
+            🏆 Leaderboard
+          </button>
+          <button
+            onClick={() => router.push("/calcutta")}
+            className="bg-white border border-sky-200 rounded-xl px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-sky-50 transition-colors"
+          >
+            🤑 Calcutta
+          </button>
+          <button
+            onClick={() => {
+              const gid = players.find((p) => p.day1GroupId)?.day1GroupId ?? "";
+              router.push(`/group/${gid}/admin`);
+            }}
+            className="bg-white border border-sky-200 rounded-xl px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-sky-50 transition-colors"
+          >
+            ⚙️ Admin
+          </button>
         </div>
 
         <input
