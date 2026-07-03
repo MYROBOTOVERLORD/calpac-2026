@@ -4,6 +4,12 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { collection, doc, onSnapshot, type Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { COURSES, HILLS, type CourseData } from "@/lib/courses";
+
+type CalcuttaEventDoc = {
+	name?: string;
+	course?: string;
+};
 
 type CalcuttaTeamDoc = {
 	teamName?: string;
@@ -25,6 +31,7 @@ type TeamRow = {
 	holesPlayed: number;
 	teamGross: number | null;
 	teamNet: number | null;
+	runningNet: number | null;
 };
 
 const EVENT_ID = "current";
@@ -41,25 +48,28 @@ function coerceScores(input: unknown) {
 	});
 }
 
-function sumScores(scores: Array<number | null>) {
-	let total = 0, count = 0;
-	for (const s of scores) {
-		if (typeof s === "number" && Number.isFinite(s)) { total += s; count++; }
-	}
-	return { total, count };
+function strokesOnHole(teamHandicap: number, holeHandicap: number): number {
+	return Math.max(0, Math.floor((teamHandicap + 18 - holeHandicap) / 18));
 }
 
-function toPar(gross: number, holes: number) {
-	if (gross === 0) return null;
-	const diff = gross - holes; // placeholder — we don't have par per hole here
-	return diff;
+function computeScoreTotals(scores: Array<number | null>, course: CourseData, teamHandicap: number) {
+	let gross = 0, strokes = 0, count = 0;
+	for (let i = 0; i < 18; i++) {
+		const s = scores[i];
+		if (typeof s === "number") {
+			gross += s;
+			strokes += strokesOnHole(teamHandicap, course.holes[i].handicap);
+			count++;
+		}
+	}
+	return { gross, strokes, count };
 }
 
 export default function CalcuttaLeaderboardPage() {
 	const router = useRouter();
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
-	const [eventName, setEventName] = useState<string>("");
+	const [event, setEvent] = useState<CalcuttaEventDoc | null>(null);
 	const [teams, setTeams] = useState<Array<{ id: string; data: CalcuttaTeamDoc }>>([]);
 
 	useEffect(() => {
@@ -67,7 +77,7 @@ export default function CalcuttaLeaderboardPage() {
 		const teamsRef = collection(db, "calcuttaEvents", EVENT_ID, "teams");
 
 		const unsubEvent = onSnapshot(eventRef, (snap) => {
-			if (snap.exists()) setEventName((snap.data().name as string) ?? "");
+			if (snap.exists()) setEvent(snap.data() as CalcuttaEventDoc);
 			setLoading(false);
 		}, (err) => {
 			setError(err instanceof Error ? err.message : String(err));
@@ -83,6 +93,11 @@ export default function CalcuttaLeaderboardPage() {
 		return () => { unsubEvent(); unsubTeams(); };
 	}, []);
 
+	const course: CourseData = useMemo(() => {
+		const courseId = event?.course ?? "hills";
+		return COURSES[courseId] ?? HILLS;
+	}, [event?.course]);
+
 	const rows = useMemo((): TeamRow[] => {
 		const out = teams.map(({ id, data }) => {
 			const playerA = (data.playerA ?? "").trim();
@@ -91,12 +106,13 @@ export default function CalcuttaLeaderboardPage() {
 				? Math.floor(data.handicap)
 				: Math.floor(safeNum(data.handicapA, 0)) + Math.floor(safeNum(data.handicapB, 0));
 			const scores = coerceScores(data.scores);
-			const { total: gross, count: holesPlayed } = sumScores(scores);
+			const { gross, strokes, count: holesPlayed } = computeScoreTotals(scores, course, teamHandicap);
 			const teamGross = holesPlayed > 0 ? gross : null;
 			const complete = holesPlayed === 18;
 			const teamNet = complete && teamGross != null ? teamGross - teamHandicap : null;
+			const runningNet = holesPlayed > 0 ? gross - strokes : null;
 			const teamName = (data.teamName ?? "").trim() || `${playerA || "Player A"} / ${playerB || "Player B"}`;
-			return { id, teamName, playerA: playerA || "—", playerB: playerB || "—", teamHandicap, holesPlayed, teamGross, teamNet };
+			return { id, teamName, playerA: playerA || "—", playerB: playerB || "—", teamHandicap, holesPlayed, teamGross, teamNet, runningNet };
 		});
 
 		out.sort((a, b) => {
@@ -104,16 +120,15 @@ export default function CalcuttaLeaderboardPage() {
 			const bComplete = b.teamNet != null;
 			if (aComplete !== bComplete) return aComplete ? -1 : 1;
 			if (aComplete) return (a.teamNet! - b.teamNet!) || (a.teamGross! - b.teamGross!);
-			// Both incomplete: more holes played first, then lower gross
 			if (b.holesPlayed !== a.holesPlayed) return b.holesPlayed - a.holesPlayed;
-			const ag = a.teamGross ?? Number.POSITIVE_INFINITY;
-			const bg = b.teamGross ?? Number.POSITIVE_INFINITY;
+			const an = a.runningNet ?? Number.POSITIVE_INFINITY;
+			const bn = b.runningNet ?? Number.POSITIVE_INFINITY;
 			const numA = parseInt(a.teamName.replace(/\D/g, ""), 10);
 			const numB = parseInt(b.teamName.replace(/\D/g, ""), 10);
-			return ag - bg || (!isNaN(numA) && !isNaN(numB) ? numA - numB : a.teamName.localeCompare(b.teamName));
+			return an - bn || (!isNaN(numA) && !isNaN(numB) ? numA - numB : a.teamName.localeCompare(b.teamName));
 		});
 		return out;
-	}, [teams]);
+	}, [teams, course]);
 
 	if (loading) return (
 		<main className="min-h-screen bg-zinc-950 text-white flex items-center justify-center">
@@ -143,7 +158,7 @@ export default function CalcuttaLeaderboardPage() {
 
 				<div className="mb-6">
 					<h1 className="text-2xl font-bold">🏆 Leaderboard</h1>
-					{eventName && <p className="text-zinc-500 text-sm mt-0.5">{eventName}</p>}
+					{event?.name && <p className="text-zinc-500 text-sm mt-0.5">{event.name}</p>}
 				</div>
 
 				{rows.length === 0 ? (
@@ -154,12 +169,8 @@ export default function CalcuttaLeaderboardPage() {
 					<div className="space-y-2">
 						{rows.map((r, idx) => {
 							const complete = r.teamNet != null;
-							const netDisplay = r.teamNet != null
-								? (r.teamNet > 0 ? `+${r.teamNet}` : String(r.teamNet))
-								: r.teamGross != null
-									? `${r.holesPlayed} holes`
-									: "—";
-							const isLeader = idx === 0 && complete;
+							const hasScore = r.holesPlayed > 0;
+							const isLeader = idx === 0 && hasScore;
 
 							return (
 								<button
@@ -169,8 +180,8 @@ export default function CalcuttaLeaderboardPage() {
 								>
 									<div className="flex items-center gap-3">
 										{/* Rank */}
-										<span className={`text-sm font-bold w-6 shrink-0 text-center ${isLeader ? "text-yellow-400" : idx < 3 && complete ? "text-emerald-400" : "text-zinc-600"}`}>
-											{complete ? idx + 1 : "—"}
+										<span className={`text-sm font-bold w-6 shrink-0 text-center ${isLeader ? "text-yellow-400" : idx < 3 && hasScore ? "text-emerald-400" : "text-zinc-600"}`}>
+											{hasScore ? idx + 1 : "—"}
 										</span>
 
 										{/* Team info */}
@@ -184,15 +195,15 @@ export default function CalcuttaLeaderboardPage() {
 
 										{/* Score */}
 										<div className="text-right shrink-0">
-											{r.holesPlayed > 0 ? (
+											{hasScore ? (
 												<>
 													<p className="text-xs text-zinc-500">
-														{complete ? "Net / Gross" : `Thru ${r.holesPlayed}`}
+														{complete ? "Gross / Net" : `Thru ${r.holesPlayed}`}
 													</p>
 													<p className="text-base font-bold text-emerald-400">
 														{complete
-															? `${r.teamNet} / ${r.teamGross}`
-															: r.teamGross}
+															? `${r.teamGross} / ${r.teamNet}`
+															: `${r.teamGross} / ${r.runningNet}`}
 													</p>
 												</>
 											) : (
@@ -210,7 +221,7 @@ export default function CalcuttaLeaderboardPage() {
 				)}
 
 				<p className="text-xs text-zinc-600 text-center mt-6">
-					Net = Gross − Team HCP · Tap a team to score
+					Gross / Net · Tap a team to score
 				</p>
 			</div>
 		</main>
