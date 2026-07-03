@@ -436,7 +436,7 @@ export default function CalcuttaScoringPage() {
                     {team.playerA} · {team.playerB}
                   </p>
                   <p className="text-xs text-zinc-600 mt-0.5">
-                    Team HCP {teamHandicap} · Hole idx {hcpIndices[currentHole]}{holeStrokes > 0 ? ` · −${holeStrokes} stroke` : ""}
+                    Team HCP {teamHandicap} · Hole idx {hcpIndices[currentHole]}{holeStrokes > 0 && <span className="font-bold text-yellow-400"> · −{holeStrokes} stroke</span>}
                   </p>
                   {holesPlayed > 0 && (
                     <p className="text-xs mt-1">
