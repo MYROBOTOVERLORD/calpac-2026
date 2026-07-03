@@ -697,12 +697,16 @@ export default function GroupAdminPage() {
 						const snap = await tx.get(ref);
 						if (!snap.exists()) continue;
 						const cur = snap.data() as GroupDoc;
+						// Use fresh per-group tee values as the fallback so we never overwrite
+						// one group's tee with a stale value read from a different group.
+						const effectiveTeeDay1 = edit?.teeDay1 ?? ((cur.teeChoices?.day1?.[player] as TeeKey | undefined) ?? "combo");
+						const effectiveTeeDay2 = edit?.teeDay2 ?? ((cur.teeChoices?.day2?.[player] as TeeKey | undefined) ?? "stampede");
 						tx.update(ref, {
 							handicaps: { ...(cur.handicaps ?? {}), [player]: safeHandicap },
 							day2HandicapAdjustments: { ...(cur.day2HandicapAdjustments ?? {}), [player]: safeDay2Adj },
 							charityStrokes: { ...(cur.charityStrokes ?? {}), [player]: safeCharity },
 							treeStrokes: { ...(cur.treeStrokes ?? {}), [player]: safeTree },
-							teeChoices: { day1: { ...(cur.teeChoices?.day1 ?? {}), [player]: teeDay1 }, day2: { ...(cur.teeChoices?.day2 ?? {}), [player]: teeDay2 } },
+							teeChoices: { day1: { ...(cur.teeChoices?.day1 ?? {}), [player]: effectiveTeeDay1 }, day2: { ...(cur.teeChoices?.day2 ?? {}), [player]: effectiveTeeDay2 } },
 							updatedAt: serverTimestamp(),
 						});
 					}
@@ -1043,9 +1047,15 @@ export default function GroupAdminPage() {
 												const charity = edit?.charity ?? String(g.data.charityStrokes?.[player] ?? 0);
 												const tree = edit?.tree ?? String(g.data.treeStrokes?.[player] ?? 0);
 												const teeDay1 = edit?.teeDay1 ?? ((g.data.teeChoices?.day1?.[player] as TeeKey | null | undefined) ?? "combo");
-												const teeDay2 = edit?.teeDay2 ?? ((g.data.teeChoices?.day2?.[player] as TeeKey | null | undefined) ?? "stampede");
 												const selectedDay1Gid = edit?.moveToGidDay1 !== undefined ? edit.moveToGidDay1 : (day1Gid ?? "");
 												const selectedDay2Gid = edit?.moveToGidDay2 !== undefined ? edit.moveToGidDay2 : (day2Gid ?? "");
+												// Read day2 tee from the actual day2 group so it reflects the correct stored value
+												const day2GidForDisplay = selectedDay2Gid || (day2Gid ?? "");
+												const day2GroupForDisplay = day2GidForDisplay ? allGroups.find((g2) => g2.id === day2GidForDisplay) : undefined;
+												const teeDay2 = edit?.teeDay2 ??
+													((day2GroupForDisplay?.data.teeChoices?.day2?.[player] as TeeKey | null | undefined) ??
+													(g.data.teeChoices?.day2?.[player] as TeeKey | null | undefined) ??
+													"stampede");
 												const isRowSaving = savingPlayerKey === key;
 												return (
 													<tr key={key} className="border-t border-sky-100">

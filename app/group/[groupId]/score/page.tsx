@@ -511,7 +511,7 @@ export default function ScoringPage() {
         setDay2Adjustments(coerceNumberMap(all, data.day2HandicapAdjustments ?? null, 0));
         setTeeChoicesByDay({
           day1: coerceTeeMap(all, data.teeChoices?.day1 ?? null, "combo"),
-          day2: coerceTeeMap(all, data.teeChoices?.day2 ?? null, "combo"),
+          day2: coerceTeeMap(all, data.teeChoices?.day2 ?? null, "stampede"),
         });
         setCharityStrokes(coerceNumberMap(all, data.charityStrokes ?? null, 0));
         setTreeStrokes(coerceNumberMap(all, data.treeStrokes ?? null, 0));
