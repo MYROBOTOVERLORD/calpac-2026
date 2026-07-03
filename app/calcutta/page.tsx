@@ -162,6 +162,14 @@ export default function CalcuttaPage() {
 		<main className="min-h-screen bg-zinc-950 text-white p-4 sm:p-6">
 			<div className="max-w-lg mx-auto">
 				{/* Header */}
+				<div className="mb-4">
+					<button
+						onClick={() => router.push("/")}
+						className="text-zinc-500 hover:text-zinc-300 text-sm transition-colors"
+					>
+						← Main Scoring
+					</button>
+				</div>
 				<div className="flex items-start justify-between gap-3 mb-6">
 					<div>
 						<h1 className="text-2xl font-bold">🤑 Calcutta</h1>
