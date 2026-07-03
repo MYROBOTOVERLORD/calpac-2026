@@ -683,34 +683,43 @@ export default function GroupAdminPage() {
 
 			// Handle data-only updates
 			if (!day1MoveNeeded && !day2MoveNeeded && !nameChanged) {
-				const lowered = player.trim().toLowerCase();
-				const groupsToUpdate = allGroups.filter((g) => {
-					const legacy = (g.data.playerNames ?? []).filter(Boolean);
-					const d1 = ((g.data.playerNamesByDay?.day1 ?? legacy) as string[]).filter(Boolean);
-					const d2 = ((g.data.playerNamesByDay?.day2 ?? legacy) as string[]).filter(Boolean);
-					return [...d1, ...d2].some((p) => p.toLowerCase() === lowered);
-				});
-				const targets = groupsToUpdate.length ? groupsToUpdate.map((g) => g.id) : [primaryGid];
-				await runTransaction(db, async (tx) => {
-					for (const targetGid of targets) {
-						const ref = doc(db, "groups", targetGid);
-						const snap = await tx.get(ref);
-						if (!snap.exists()) continue;
-						const cur = snap.data() as GroupDoc;
-						// Use fresh per-group tee values as the fallback so we never overwrite
-						// one group's tee with a stale value read from a different group.
-						const effectiveTeeDay1 = edit?.teeDay1 ?? ((cur.teeChoices?.day1?.[player] as TeeKey | undefined) ?? "combo");
-						const effectiveTeeDay2 = edit?.teeDay2 ?? ((cur.teeChoices?.day2?.[player] as TeeKey | undefined) ?? "stampede");
-						tx.update(ref, {
-							handicaps: { ...(cur.handicaps ?? {}), [player]: safeHandicap },
-							day2HandicapAdjustments: { ...(cur.day2HandicapAdjustments ?? {}), [player]: safeDay2Adj },
-							charityStrokes: { ...(cur.charityStrokes ?? {}), [player]: safeCharity },
-							treeStrokes: { ...(cur.treeStrokes ?? {}), [player]: safeTree },
-							teeChoices: { day1: { ...(cur.teeChoices?.day1 ?? {}), [player]: effectiveTeeDay1 }, day2: { ...(cur.teeChoices?.day2 ?? {}), [player]: effectiveTeeDay2 } },
-							updatedAt: serverTimestamp(),
-						});
-					}
-				});
+				// Skip the write entirely when no fields were actually edited.
+				// Avoids unnecessary Firestore writes and prevents the
+				// "all reads before all writes" transaction error on no-op saves.
+				const hasEdits = edit !== undefined && Object.keys(edit).length > 0;
+				if (hasEdits) {
+					const lowered = player.trim().toLowerCase();
+					const groupsToUpdate = allGroups.filter((g) => {
+						const legacy = (g.data.playerNames ?? []).filter(Boolean);
+						const d1 = ((g.data.playerNamesByDay?.day1 ?? legacy) as string[]).filter(Boolean);
+						const d2 = ((g.data.playerNamesByDay?.day2 ?? legacy) as string[]).filter(Boolean);
+						return [...d1, ...d2].some((p) => p.toLowerCase() === lowered);
+					});
+					const targets = groupsToUpdate.length ? groupsToUpdate.map((g) => g.id) : [primaryGid];
+					// Read ALL groups first, then write — Firestore transactions require
+					// all reads to precede all writes.
+					await runTransaction(db, async (tx) => {
+						const targetRefs = targets.map((gid) => doc(db, "groups", gid));
+						const snaps = await Promise.all(targetRefs.map((ref) => tx.get(ref)));
+						for (let i = 0; i < targetRefs.length; i++) {
+							const snap = snaps[i];
+							if (!snap.exists()) continue;
+							const cur = snap.data() as GroupDoc;
+							// Use fresh per-group tee values as the fallback so we never
+							// overwrite one group's tee with a stale value from a different group.
+							const effectiveTeeDay1 = edit?.teeDay1 ?? ((cur.teeChoices?.day1?.[player] as TeeKey | undefined) ?? "combo");
+							const effectiveTeeDay2 = edit?.teeDay2 ?? ((cur.teeChoices?.day2?.[player] as TeeKey | undefined) ?? "stampede");
+							tx.update(targetRefs[i], {
+								handicaps: { ...(cur.handicaps ?? {}), [player]: safeHandicap },
+								day2HandicapAdjustments: { ...(cur.day2HandicapAdjustments ?? {}), [player]: safeDay2Adj },
+								charityStrokes: { ...(cur.charityStrokes ?? {}), [player]: safeCharity },
+								treeStrokes: { ...(cur.treeStrokes ?? {}), [player]: safeTree },
+								teeChoices: { day1: { ...(cur.teeChoices?.day1 ?? {}), [player]: effectiveTeeDay1 }, day2: { ...(cur.teeChoices?.day2 ?? {}), [player]: effectiveTeeDay2 } },
+								updatedAt: serverTimestamp(),
+							});
+						}
+					});
+				}
 			}
 
 			setPlayerEdits((prev) => {
