@@ -461,7 +461,12 @@ export default function CalcuttaAdminPage() {
 								</tr>
 							</thead>
 							<tbody>
-								{teams.map(({ id, data }) => {
+								{[...teams].sort((a, b) => {
+										const numA = parseInt((a.data.teamName ?? "").replace(/\D/g, ""), 10);
+										const numB = parseInt((b.data.teamName ?? "").replace(/\D/g, ""), 10);
+										if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+										return (a.data.teamName ?? "").localeCompare(b.data.teamName ?? "");
+									}).map(({ id, data }) => {
 									const disabled = !isAdmin || rowSavingId === id;
 									const teamName = data.teamName ?? "";
 									const playerA = data.playerA ?? "";

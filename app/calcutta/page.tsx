@@ -133,7 +133,10 @@ export default function CalcuttaPage() {
 			const bn = b.teamNet == null ? Number.POSITIVE_INFINITY : b.teamNet;
 			const ag = a.teamGross == null ? Number.POSITIVE_INFINITY : a.teamGross;
 			const bg = b.teamGross == null ? Number.POSITIVE_INFINITY : b.teamGross;
-			return an - bn || ag - bg || a.teamName.localeCompare(b.teamName);
+			const numA = parseInt(a.teamName.replace(/\D/g, ""), 10);
+			const numB = parseInt(b.teamName.replace(/\D/g, ""), 10);
+			const numCmp = !isNaN(numA) && !isNaN(numB) ? numA - numB : a.teamName.localeCompare(b.teamName);
+			return an - bn || ag - bg || numCmp;
 		});
 		return out;
 	}, [teams]);

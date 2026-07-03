@@ -108,7 +108,9 @@ export default function CalcuttaLeaderboardPage() {
 			if (b.holesPlayed !== a.holesPlayed) return b.holesPlayed - a.holesPlayed;
 			const ag = a.teamGross ?? Number.POSITIVE_INFINITY;
 			const bg = b.teamGross ?? Number.POSITIVE_INFINITY;
-			return ag - bg || a.teamName.localeCompare(b.teamName);
+			const numA = parseInt(a.teamName.replace(/\D/g, ""), 10);
+			const numB = parseInt(b.teamName.replace(/\D/g, ""), 10);
+			return ag - bg || (!isNaN(numA) && !isNaN(numB) ? numA - numB : a.teamName.localeCompare(b.teamName));
 		});
 		return out;
 	}, [teams]);
