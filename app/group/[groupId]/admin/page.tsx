@@ -1032,19 +1032,19 @@ export default function GroupAdminPage() {
 							{allGroupsError ? <p className="text-sm text-red-600 mt-2">{allGroupsError}</p> : null}
 
 							<div className="mt-3 overflow-x-auto">
-								<table className="w-full min-w-[1180px] text-sm">
+								<table className="w-full min-w-[740px] text-xs">
 									<thead>
 										<tr className="text-left text-slate-700">
-											<th className="p-2 min-w-[220px]">Player</th>
-											<th className="p-2 min-w-[80px]">D1 Group</th>
-											<th className="p-2 min-w-[80px]">D2 Group</th>
-											<th className="p-2">D1 HCP</th>
-											<th className="p-2">D2 HCP</th>
-											<th className="p-2">Day 1 tee</th>
-											<th className="p-2">Day 2 tee</th>
-											<th className="p-2">Char</th>
-											<th className="p-2">Tree</th>
-											<th className="p-2"></th>
+											<th className="p-1">Player</th>
+											<th className="p-1">Grp 1</th>
+											<th className="p-1">Grp 2</th>
+											<th className="p-1">HCP</th>
+											<th className="p-1">D2 Adj</th>
+											<th className="p-1">Tee 1</th>
+											<th className="p-1">Tee 2</th>
+											<th className="p-1">Chr</th>
+											<th className="p-1">Tre</th>
+											<th className="p-1"></th>
 										</tr>
 									</thead>
 									<tbody>
@@ -1068,7 +1068,7 @@ export default function GroupAdminPage() {
 												const isRowSaving = savingPlayerKey === key;
 												return (
 													<tr key={key} className="border-t border-sky-100">
-													<td className="p-2 min-w-[220px]">
+													<td className="p-1">
 														<input
 															value={edit?.name ?? player}
 															onChange={(e) =>
@@ -1077,11 +1077,11 @@ export default function GroupAdminPage() {
 																	[key]: { ...(prev[key] ?? {}), name: e.target.value },
 																}))
 															}
-																className="w-[20ch] max-w-[20ch] p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
+															className="w-[13ch] px-1 py-1 bg-white border border-sky-200 rounded focus:outline-none focus:ring-1 focus:ring-sky-300 text-xs"
 															placeholder="Player"
 														/>
 													</td>
-													<td className="p-2">
+													<td className="p-1">
 														<select
 															value={selectedDay1Gid}
 															onChange={(e) =>
@@ -1090,7 +1090,7 @@ export default function GroupAdminPage() {
 																	[key]: { ...(prev[key] ?? {}), moveToGidDay1: e.target.value },
 																}))
 															}
-															className="w-16 p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
+															className="w-12 px-1 py-1 bg-white border border-sky-200 rounded focus:outline-none focus:ring-1 focus:ring-sky-300 text-xs"
 														>
 															<option value="">—</option>
 															{foursomeOptions.map((opt) => (
@@ -1098,7 +1098,7 @@ export default function GroupAdminPage() {
 															))}
 														</select>
 													</td>
-													<td className="p-2">
+													<td className="p-1">
 														<select
 															value={selectedDay2Gid}
 															onChange={(e) =>
@@ -1107,7 +1107,7 @@ export default function GroupAdminPage() {
 																	[key]: { ...(prev[key] ?? {}), moveToGidDay2: e.target.value },
 																}))
 															}
-															className="w-16 p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
+															className="w-12 px-1 py-1 bg-white border border-sky-200 rounded focus:outline-none focus:ring-1 focus:ring-sky-300 text-xs"
 														>
 															<option value="">—</option>
 															{foursomeOptions.map((opt) => (
@@ -1115,7 +1115,7 @@ export default function GroupAdminPage() {
 															))}
 														</select>
 													</td>
-													<td className="p-2">
+													<td className="p-1">
 														<input
 															value={handicap}
 															onChange={(e) =>
@@ -1125,10 +1125,10 @@ export default function GroupAdminPage() {
 																}))
 														}
 															inputMode="numeric"
-																className="w-16 p-2 bg-white border border-sky-200 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-sky-200"
+															className="w-10 px-1 py-1 bg-white border border-sky-200 rounded text-center focus:outline-none focus:ring-1 focus:ring-sky-300 text-xs"
 														/>
 													</td>
-													<td className="p-2">
+													<td className="p-1">
 														<input
 															value={day2Adj}
 															onChange={(e) =>
@@ -1138,10 +1138,10 @@ export default function GroupAdminPage() {
 																}))
 														}
 															inputMode="numeric"
-																className="w-16 p-2 bg-white border border-sky-200 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-sky-200"
+															className="w-10 px-1 py-1 bg-white border border-sky-200 rounded text-center focus:outline-none focus:ring-1 focus:ring-sky-300 text-xs"
 														/>
 													</td>
-													<td className="p-2">
+													<td className="p-1">
 														<select
 															value={teeDay1}
 															onChange={(e) =>
@@ -1150,14 +1150,14 @@ export default function GroupAdminPage() {
 																	[key]: { ...(prev[key] ?? {}), teeDay1: e.target.value as TeeKey },
 																}))
 														}
-																className="p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
+															className="px-1 py-1 bg-white border border-sky-200 rounded focus:outline-none focus:ring-1 focus:ring-sky-300 text-xs"
 														>
-																			<option value="combo">2 Trees</option>
-															<option value="three">3 Trees (+1)</option>
+															<option value="combo">2 Trees</option>
+															<option value="three">3 Trees</option>
 															<option value="four">4 Trees</option>
 														</select>
 													</td>
-													<td className="p-2">
+													<td className="p-1">
 														<select
 															value={teeDay2}
 															onChange={(e) =>
@@ -1166,13 +1166,13 @@ export default function GroupAdminPage() {
 																	[key]: { ...(prev[key] ?? {}), teeDay2: e.target.value as TeeKey },
 																}))
 														}
-																className="p-2 bg-white border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200"
+															className="px-1 py-1 bg-white border border-sky-200 rounded focus:outline-none focus:ring-1 focus:ring-sky-300 text-xs"
 														>
-															<option value="stampede">Stampede</option>
+															<option value="stampede">Stmpde</option>
 															<option value="tips">Tips</option>
 														</select>
 													</td>
-													<td className="p-2">
+													<td className="p-1">
 														<input
 															value={charity}
 															onChange={(e) =>
@@ -1182,42 +1182,42 @@ export default function GroupAdminPage() {
 																}))
 														}
 															inputMode="numeric"
-																className="w-16 p-2 bg-white border border-sky-200 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-sky-200"
+															className="w-9 px-1 py-1 bg-white border border-sky-200 rounded text-center focus:outline-none focus:ring-1 focus:ring-sky-300 text-xs"
 														/>
 													</td>
-																<td className="p-2">
-																	<input
-																	value={tree}
-																	onChange={(e) =>
-																	setPlayerEdits((prev) => ({
-																		...prev,
-																		[key]: { ...(prev[key] ?? {}), tree: e.target.value },
-																	}))
-																}
-																	inputMode="numeric"
-																		className="w-16 p-2 bg-white border border-sky-200 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-sky-200"
-																	/>
-																	</td>
-													<td className="p-2 whitespace-nowrap">
-														<div className="flex gap-2">
+													<td className="p-1">
+														<input
+															value={tree}
+															onChange={(e) =>
+																setPlayerEdits((prev) => ({
+																	...prev,
+																	[key]: { ...(prev[key] ?? {}), tree: e.target.value },
+																}))
+														}
+															inputMode="numeric"
+															className="w-9 px-1 py-1 bg-white border border-sky-200 rounded text-center focus:outline-none focus:ring-1 focus:ring-sky-300 text-xs"
+														/>
+													</td>
+													<td className="p-1 whitespace-nowrap">
+														<div className="flex gap-1">
 															<button
 																onClick={() => router.push(`/group/${g.id}/admin`)}
-																	className="bg-white hover:bg-sky-50 border border-sky-200 px-3 py-2 rounded-lg text-sm"
+																className="bg-white hover:bg-sky-50 border border-sky-200 px-2 py-1 rounded text-xs"
 															>
 																Open
 															</button>
 															<button
 																onClick={() => deletePlayerGlobally(player, day1Gid, day2Gid)}
-																	className="bg-white hover:bg-sky-50 border border-sky-200 px-3 py-2 rounded-lg text-sm"
+																className="bg-white hover:bg-sky-50 border border-sky-200 px-2 py-1 rounded text-xs"
 															>
-																Delete
+																Del
 															</button>
 															<button
 																onClick={() => savePlayerEdits({ player, currentDay1Gid: day1Gid, currentDay2Gid: day2Gid })}
 																disabled={isRowSaving}
-																	className="bg-sky-600 hover:bg-sky-500 disabled:opacity-60 px-3 py-2 rounded-lg font-semibold text-white"
+																className="bg-sky-600 hover:bg-sky-500 disabled:opacity-60 px-2 py-1 rounded font-semibold text-white text-xs"
 															>
-																{isRowSaving ? "Saving…" : "Save"}
+																{isRowSaving ? "…" : "Save"}
 															</button>
 														</div>
 													</td>
