@@ -10,6 +10,7 @@ import {
 	serverTimestamp,
 	setDoc,
 	deleteDoc,
+	writeBatch,
 	type Timestamp,
 } from "firebase/firestore";
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut, type User } from "firebase/auth";
@@ -303,6 +304,25 @@ export default function CalcuttaAdminPage() {
 		}
 	}
 
+	async function clearAllCalcuttaScores() {
+		if (!isAdmin) return;
+		if (!window.confirm("Clear ALL scores for ALL Calcutta teams? This cannot be undone.")) return;
+		setRowError(null);
+		try {
+			const batch = writeBatch(db);
+			const emptyScores = Array.from({ length: 18 }, () => null);
+			for (const { id } of teams) {
+				batch.update(doc(db, "calcuttaEvents", EVENT_ID, "teams", id), {
+					scores: emptyScores,
+					updatedAt: serverTimestamp(),
+				});
+			}
+			await batch.commit();
+		} catch (err) {
+			setRowError(err instanceof Error ? err.message : String(err));
+		}
+	}
+
 	if (loading) return <main className="min-h-screen bg-sky-50 text-slate-900 p-3 sm:p-6">Loading…</main>;
 	if (error) return <main className="min-h-screen bg-sky-50 text-slate-900 p-3 sm:p-6">{error}</main>;
 
@@ -495,7 +515,17 @@ export default function CalcuttaAdminPage() {
 				<div className="mt-4 bg-white/80 border border-sky-200 rounded-2xl p-4 sm:p-5">
 					<div className="flex items-center justify-between gap-3 flex-wrap">
 						<h2 className="text-lg font-semibold">Teams</h2>
-						<p className="text-sm text-slate-600">{teams.length} teams</p>
+						<div className="flex items-center gap-2">
+							<p className="text-sm text-slate-600">{teams.length} teams</p>
+							{isAdmin && (
+								<button
+									onClick={clearAllCalcuttaScores}
+									className="bg-red-600 hover:bg-red-500 px-3 py-1.5 rounded-lg font-semibold text-white text-sm"
+								>
+									Clear All Scores
+								</button>
+							)}
+						</div>
 					</div>
 					<div className="mt-3 overflow-x-auto bg-white border border-sky-200 rounded-xl">
 						<table className="w-full min-w-[980px] text-sm">

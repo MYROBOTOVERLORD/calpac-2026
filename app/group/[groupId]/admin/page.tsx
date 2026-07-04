@@ -918,6 +918,24 @@ export default function GroupAdminPage() {
 	}
 
 
+	async function clearGroupScores(day: DayKey) {
+		if (!isAdmin || !groupId) return;
+		const label = day === "day1" ? "Day 1" : "Day 2";
+		if (!window.confirm(`Clear ALL ${label} scores for this foursome? This cannot be undone.`)) return;
+		const emptyScores = Object.fromEntries(players.map((p) => [p, Array.from({ length: 18 }, () => null)]));
+		setSaving(true);
+		try {
+			await updateDoc(doc(db, "groups", groupId), {
+				[`scores.${day}`]: emptyScores,
+				updatedAt: serverTimestamp(),
+			});
+		} catch (err) {
+			setError(err instanceof Error ? err.message : String(err));
+		} finally {
+			setSaving(false);
+		}
+	}
+
 	if (loading) return <main className="min-h-screen bg-sky-50 text-slate-900 p-6">Loading…</main>;
 	if (error) return <main className="min-h-screen bg-sky-50 text-slate-900 p-6">{error}</main>;
 	if (!group) return <main className="min-h-screen bg-sky-50 text-slate-900 p-6">Missing group.</main>;
@@ -1015,6 +1033,23 @@ export default function GroupAdminPage() {
 									{day1LockSaving ? "Saving…" : group.day1ScoresLocked ? "Unlock Day 1" : "Lock Day 1"}
 								</button>
 								<p className="text-sm text-slate-700">Status: {group.day1ScoresLocked ? "Locked" : "Unlocked"}</p>
+							</div>
+							<div className="mt-3 flex items-center gap-3 flex-wrap">
+								<button
+									onClick={() => clearGroupScores("day1")}
+									disabled={saving}
+									className="bg-red-600 hover:bg-red-500 disabled:opacity-60 px-4 py-2 rounded-lg font-semibold text-white text-sm"
+								>
+									Clear Day 1 Scores
+								</button>
+								<button
+									onClick={() => clearGroupScores("day2")}
+									disabled={saving}
+									className="bg-red-600 hover:bg-red-500 disabled:opacity-60 px-4 py-2 rounded-lg font-semibold text-white text-sm"
+								>
+									Clear Day 2 Scores
+								</button>
+								<p className="text-xs text-slate-500">Clears all scores for this foursome only</p>
 							</div>
 							{day1LockError ? <p className="text-sm text-red-600 mt-2">{day1LockError}</p> : null}
 						</div>
