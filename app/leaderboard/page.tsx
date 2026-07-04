@@ -80,7 +80,7 @@ function applyCharity(net: number, scores: Array<number | null>, charity: number
 }
 
 function teeBonusForDay(day: DayKey, tee?: string | null): number {
-  return day === "day1" && tee === "three" ? 1 : 0;
+  return day === "day1" && tee === "three" ? -1 : 0;
 }
 
 function fmtToPar(v: number | null): string {
@@ -123,7 +123,8 @@ function computeLeaderboard(groups: GroupDoc[], day: DayKey): PlayerRow[] {
       const teeKey = day === "day1" ? g.teeChoices?.day1?.[p] : g.teeChoices?.day2?.[p];
       const teeBonus = teeBonusForDay(day, teeKey);
       const charity = ((g.charityStrokes?.[p] ?? 0) as number) + ((g.treeStrokes?.[p] ?? 0) as number);
-      const net = applyCharity(netRunning(s, hcpsValid, hcp + adj + teeBonus), s, charity);
+      const baseNet = applyCharity(netRunning(s, hcpsValid, hcp + adj), s, charity);
+      const net = isCompleteRound(s) ? baseNet + teeBonus : baseNet;
       const holesPlayed = s.filter((v) => typeof v === "number").length;
       rows.push({
         player: p,
