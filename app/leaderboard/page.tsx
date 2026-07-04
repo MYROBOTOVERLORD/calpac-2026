@@ -39,6 +39,7 @@ type PlayerRow = {
   net: number;
   netToPar: number | null;
   holesPlayed: number;
+  teeKey: string | null;
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -132,6 +133,7 @@ function computeLeaderboard(groups: GroupDoc[], day: DayKey): PlayerRow[] {
         net,
         netToPar: toParSoFar(s, parsValid),
         holesPlayed,
+        teeKey: teeKey ?? null,
       });
     }
   }
@@ -290,6 +292,11 @@ export default function LeaderboardPage() {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-white truncate">{r.player}</p>
                   <p className="text-[11px] text-zinc-500 truncate">{r.group}</p>
+                  {finished && r.teeKey === "three" && (
+                    <span className="inline-block mt-0.5 text-[10px] font-bold text-yellow-400 bg-yellow-400/10 border border-yellow-400/30 rounded px-1.5 py-0.5">
+                      3 Trees −1
+                    </span>
+                  )}
                 </div>
                 <span className={`text-xs w-8 text-right shrink-0 font-semibold ${finished ? "text-emerald-400" : "text-zinc-500"}`}>
                   {thru}
