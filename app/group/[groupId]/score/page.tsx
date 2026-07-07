@@ -789,7 +789,7 @@ export default function ScoringPage() {
               const diff = rt - parForScoredHoles;
 
               return (
-                <div key={player} className="flex items-center gap-4 bg-zinc-900 rounded-2xl px-4 py-3">
+                <div key={player} className="flex items-center gap-3 bg-zinc-900 rounded-2xl px-4 py-3">
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-white truncate">{player}</p>
                     <p className="text-xs text-zinc-500 mt-0.5">
@@ -804,8 +804,11 @@ export default function ScoringPage() {
                         <span className="text-zinc-600">No score yet</span>
                       )}
                     </p>
+                    {holeStrokes > 0 && (
+                      <p className="text-xs font-bold text-yellow-400 mt-0.5">−1 Stroke</p>
+                    )}
                   </div>
-                  <div className="text-right">
+                  <div className="text-right shrink-0">
                     <p className="text-xs text-zinc-500">Thru {holesPlayed || "—"}</p>
                     <p className="text-sm font-bold">
                       {holesPlayed > 0 ? (
@@ -821,6 +824,14 @@ export default function ScoringPage() {
                     disabled={isDay1Locked}
                     onChange={(v) => handleScoreChange(player, currentHole, v)}
                   />
+                  {holeStrokes > 0 && (
+                    <div className={`w-10 h-10 rounded-xl flex flex-col items-center justify-center shrink-0 ${getScoreColor(netHole, hole.par)}`}>
+                      <span className="text-sm font-bold leading-none">{netHole ?? "—"}</span>
+                      {netHole !== null && (
+                        <span className="text-[9px] font-semibold opacity-75 mt-0.5 leading-none">{getScoreLabel(netHole, hole.par)}</span>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}
