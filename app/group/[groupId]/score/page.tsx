@@ -961,7 +961,7 @@ export default function ScoringPage() {
 
             {/* Longest Drive */}
             <div>
-              <p className="text-xs font-semibold text-zinc-400 mb-2">💨 Longest Drive</p>
+              <p className="text-xs font-semibold text-zinc-400 mb-2">💨 Longest Drive · <span className="text-zinc-500">Hole {selectedDay === "day1" ? 13 : 15}</span></p>
               <div className="bg-zinc-800 rounded-xl p-3">
                 <input
                   value={ldWinner}
