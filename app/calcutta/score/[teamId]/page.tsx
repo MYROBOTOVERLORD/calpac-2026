@@ -441,7 +441,7 @@ export default function CalcuttaScoringPage() {
                     {team.playerA} · {team.playerB}
                   </p>
                   <p className="text-xs text-zinc-600 mt-0.5">
-                    Team HCP {teamHandicap} · Hole idx {hcpIndices[currentHole]}{holeStrokes > 0 && <span className="font-bold text-yellow-400"> · −{holeStrokes} stroke</span>}
+                    Team HCP <span className="font-bold text-green-400">{teamHandicap}</span> · Hole idx {hcpIndices[currentHole]}{holeStrokes > 0 && <span className="font-bold text-yellow-400"> · −{holeStrokes} stroke</span>}
                   </p>
                   {holesPlayed > 0 && (
                     <p className="text-xs mt-1">
@@ -519,7 +519,7 @@ export default function CalcuttaScoringPage() {
           <div className="bg-zinc-900 rounded-2xl px-4 py-4 flex items-center gap-4">
             <div className="flex-1">
               <p className="font-semibold text-white">{teamDisplayName}</p>
-              <p className="text-xs text-zinc-500 mt-0.5">Combined Hcp: {teamHandicap}</p>
+              <p className="text-xs text-zinc-500 mt-0.5">Combined Hcp: <span className="font-bold text-green-400">{teamHandicap}</span></p>
             </div>
             <div className="text-right">
               <p className="text-xs text-zinc-500">Gross</p>
