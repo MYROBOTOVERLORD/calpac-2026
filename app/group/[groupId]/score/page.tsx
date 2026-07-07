@@ -760,7 +760,7 @@ export default function ScoringPage() {
                   <span className="bg-white/20 backdrop-blur-sm rounded-full px-3 py-1 text-sm font-semibold">Par {hole.par}</span>
                   <span className="bg-white/20 backdrop-blur-sm rounded-full px-3 py-1 text-sm font-semibold">Hdcp {hole.handicap}</span>
                   <span className="bg-white/20 backdrop-blur-sm rounded-full px-3 py-1 text-sm font-semibold">
-                    {hole.tees[1]?.yardage ?? hole.tees[0]?.yardage} yds
+                    {(hole.tees.find(t => t.name === "White" || t.name === "Stampede")?.yardage ?? hole.tees[0]?.yardage)} yds
                   </span>
                 </div>
               </div>
