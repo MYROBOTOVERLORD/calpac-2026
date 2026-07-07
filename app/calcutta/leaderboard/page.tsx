@@ -33,7 +33,14 @@ type TeamRow = {
 	teamGross: number | null;
 	teamNet: number | null;
 	runningNet: number | null;
+	grossToPar: number | null;
+	netToPar: number | null;
 };
+
+function fmtToPar(v: number | null): string {
+	if (v == null) return "—";
+	return v === 0 ? "E" : v < 0 ? String(v) : `+${v}`;
+}
 
 const EVENT_ID = "current";
 
@@ -121,8 +128,11 @@ export default function CalcuttaLeaderboardPage() {
 			const complete = holesPlayed === 18;
 			const teamNet = complete && teamGross != null ? teamGross - teamHandicap : null;
 			const runningNet = holesPlayed > 0 ? gross - strokes : null;
+			const parThrough = course.holes.reduce((acc, h, i) => scores[i] != null ? acc + h.par : acc, 0);
+			const grossToPar = holesPlayed > 0 ? gross - parThrough : null;
+			const netToPar = holesPlayed > 0 ? (gross - strokes) - parThrough : null;
 			const teamName = (data.teamName ?? "").trim() || `${playerA || "Player A"} / ${playerB || "Player B"}`;
-			return { id, teamName, playerA: playerA || "—", playerB: playerB || "—", teamHandicap, holesPlayed, teamGross, teamNet, runningNet };
+			return { id, teamName, playerA: playerA || "—", playerB: playerB || "—", teamHandicap, holesPlayed, teamGross, teamNet, runningNet, grossToPar, netToPar };
 		});
 
 		out.sort((a, b) => {
@@ -138,7 +148,7 @@ export default function CalcuttaLeaderboardPage() {
 			return an - bn || (!isNaN(numA) && !isNaN(numB) ? numA - numB : a.teamName.localeCompare(b.teamName));
 		});
 		return out;
-	}, [teams, hcpIndices]);
+	}, [teams, hcpIndices, course]);
 
 	if (loading) return (
 		<main className="min-h-screen bg-zinc-950 text-white flex items-center justify-center">
@@ -208,12 +218,12 @@ export default function CalcuttaLeaderboardPage() {
 											{hasScore ? (
 												<>
 													<p className="text-xs text-zinc-500">
-														{complete ? "Gross / Net" : `Thru ${r.holesPlayed}`}
+														{complete ? "F · Gross / Net" : `Thru ${r.holesPlayed}`}
 													</p>
-													<p className="text-base font-bold text-emerald-400">
-														{complete
-															? `${r.teamGross} / ${r.teamNet}`
-															: `${r.teamGross} / ${r.runningNet}`}
+													<p className="text-base font-bold">
+														<span className="text-zinc-400">{fmtToPar(r.grossToPar)}</span>
+														<span className="text-zinc-600"> / </span>
+														<span className={r.netToPar != null && r.netToPar < 0 ? "text-red-400" : r.netToPar === 0 ? "text-emerald-400" : "text-white"}>{fmtToPar(r.netToPar)}</span>
 													</p>
 												</>
 											) : (
@@ -231,7 +241,7 @@ export default function CalcuttaLeaderboardPage() {
 				)}
 
 				<p className="text-xs text-zinc-600 text-center mt-6">
-					Gross / Net · Tap a team to score
+					Gross to par / Net to par · Tap a team to score
 				</p>
 			</div>
 		</main>
