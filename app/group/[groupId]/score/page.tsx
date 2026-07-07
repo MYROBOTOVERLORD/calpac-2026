@@ -408,10 +408,7 @@ export default function ScoringPage() {
     return Array.isArray(h) && h.length === HOLE_COUNT ? h : null;
   }, [group?.tournament, selectedDay]);
 
-  const par3Holes = useMemo(() => {
-    if (!dayPars) return [] as number[];
-    return dayPars.map((p, i) => (p === 3 ? i + 1 : null)).filter((v): v is number => v !== null);
-  }, [dayPars]);
+  const par3Holes = [3, 7, 15, 17];
 
   const runningTotals = useMemo(() => {
     const t: Record<string, number> = {};
