@@ -240,22 +240,8 @@ function GreenPopup({ hole, course, onClose }: {
         </div>
 
         <div className="px-5 py-4">
-          <p className="text-xs font-semibold tracking-widest text-zinc-500 uppercase mb-3">
-            Tee Distances
-          </p>
-          <div className="grid grid-cols-2 gap-2">
-            {hole.tees.map((tee) => (
-              <div
-                key={tee.name}
-                className="flex items-center justify-between bg-zinc-800 rounded-xl px-4 py-2.5"
-              >
-                <span className="text-sm text-zinc-400">{tee.name}</span>
-                <span className="text-sm font-bold text-white">{tee.yardage} yds</span>
-              </div>
-            ))}
-          </div>
           {hole.description && (
-            <p className="mt-4 text-sm text-zinc-400 leading-relaxed italic">
+            <p className="text-sm text-zinc-400 leading-relaxed italic">
               {hole.description}
             </p>
           )}
