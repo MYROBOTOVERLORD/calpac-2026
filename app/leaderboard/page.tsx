@@ -8,6 +8,7 @@ import { db } from "@/lib/firebase";
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 type DayKey = "day1" | "day2";
+type ViewKey = DayKey | "overall";
 
 type GroupDoc = {
   id: string;
@@ -141,6 +142,26 @@ function computeLeaderboard(groups: GroupDoc[], day: DayKey): PlayerRow[] {
   return rows;
 }
 
+function computeOverall(groups: GroupDoc[]): PlayerRow[] {
+  const d1 = computeLeaderboard(groups, "day1");
+  const d2 = computeLeaderboard(groups, "day2");
+  const map = new Map<string, { r1?: PlayerRow; r2?: PlayerRow }>();
+  for (const r of d1) map.set(r.player, { r1: r });
+  for (const r of d2) { const e = map.get(r.player) ?? {}; map.set(r.player, { ...e, r2: r }); }
+  return Array.from(map.values()).map(({ r1, r2 }) => ({
+    player: (r1 ?? r2)!.player,
+    group: r1?.group ?? r2?.group ?? "",
+    gross: (r1?.gross ?? 0) + (r2?.gross ?? 0),
+    grossToPar: r1?.grossToPar != null || r2?.grossToPar != null
+      ? (r1?.grossToPar ?? 0) + (r2?.grossToPar ?? 0) : null,
+    net: (r1?.net ?? 0) + (r2?.net ?? 0),
+    netToPar: r1?.netToPar != null || r2?.netToPar != null
+      ? (r1?.netToPar ?? 0) + (r2?.netToPar ?? 0) : null,
+    holesPlayed: (r1?.holesPlayed ?? 0) + (r2?.holesPlayed ?? 0),
+    teeKey: r1?.teeKey ?? null,
+  }));
+}
+
 function sortedGross(rows: PlayerRow[]): PlayerRow[] {
   return [...rows].sort((a, b) => {
     if (a.holesPlayed === 0 && b.holesPlayed > 0) return 1;
@@ -165,7 +186,7 @@ export default function LeaderboardPage() {
   const router = useRouter();
   const [groups, setGroups] = useState<GroupDoc[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedDay, setSelectedDay] = useState<DayKey>("day1");
+  const [selectedDay, setSelectedDay] = useState<ViewKey>("day1");
   const [boardType, setBoardType] = useState<"net" | "gross">("net");
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
@@ -182,10 +203,14 @@ export default function LeaderboardPage() {
     return () => unsub();
   }, []);
 
-  const allRows = useMemo(() => computeLeaderboard(groups, selectedDay), [groups, selectedDay]);
+  const allRows = useMemo(
+    () => selectedDay === "overall" ? computeOverall(groups) : computeLeaderboard(groups, selectedDay),
+    [groups, selectedDay]
+  );
   const leaderboard = useMemo(() => boardType === "gross" ? sortedGross(allRows) : sortedNet(allRows), [allRows, boardType]);
 
   const courseName = useMemo(() => {
+    if (selectedDay === "overall") return "Old Greenwood + Gray's Crossing";
     const names = new Set(
       groups
         .map((g) => (selectedDay === "day1" ? g.tournament?.day1Course : g.tournament?.day2Course))
@@ -229,7 +254,7 @@ export default function LeaderboardPage() {
 
         {/* Day selector */}
         <div className="flex gap-2 mb-3">
-          {(["day1", "day2"] as DayKey[]).map((d) => (
+          {(["day1", "day2", "overall"] as ViewKey[]).map((d) => (
             <button
               key={d}
               onClick={() => setSelectedDay(d)}
@@ -237,7 +262,7 @@ export default function LeaderboardPage() {
                 selectedDay === d ? "bg-emerald-600 text-white" : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"
               }`}
             >
-              {d === "day1" ? "Day 1" : "Day 2"}
+              {d === "day1" ? "Day 1" : d === "day2" ? "Day 2" : "Overall"}
             </button>
           ))}
         </div>
@@ -274,7 +299,8 @@ export default function LeaderboardPage() {
         <div className="space-y-1.5">
           {leaderboard.map((r, i) => {
             const active = r.holesPlayed > 0;
-            const finished = r.holesPlayed === HOLE_COUNT;
+            const maxHoles = selectedDay === "overall" ? HOLE_COUNT * 2 : HOLE_COUNT;
+            const finished = r.holesPlayed === maxHoles;
             const thru = finished ? "F" : active ? String(r.holesPlayed) : "—";
             const score = boardType === "net" ? r.net : r.gross;
             const toPar = boardType === "net" ? r.netToPar : r.grossToPar;
