@@ -33,6 +33,8 @@ type TeamLeaderRow = {
   teamGross: number | null;
   teamNet: number | null;
   runningNet: number | null;
+  grossToPar: number | null;
+  netToPar: number | null;
 };
 
 const EVENT_ID = "current";
@@ -292,8 +294,11 @@ export default function CalcuttaScoringPage() {
           if (s[i] != null) runningStrokes += strokesForHole(hcpIndices[i], hcp);
         }
         const runningNet = holesPlayed > 0 ? (gross ?? 0) - runningStrokes : null;
+        const parThrough = course.holes.reduce((acc, h, i) => s[i] != null ? acc + h.par : acc, 0);
+        const grossToPar = holesPlayed > 0 ? (gross ?? 0) - parThrough : null;
+        const netToPar = holesPlayed > 0 ? ((gross ?? 0) - runningStrokes) - parThrough : null;
         const name = (data.teamName ?? "").trim() || `${data.playerA ?? "?"} / ${data.playerB ?? "?"}`;
-        return { id, teamName: name, playerA: (data.playerA ?? "").trim(), playerB: (data.playerB ?? "").trim(), teamHandicap: hcp, teamGross: gross, teamNet: net, runningNet };
+        return { id, teamName: name, playerA: (data.playerA ?? "").trim(), playerB: (data.playerB ?? "").trim(), teamHandicap: hcp, teamGross: gross, teamNet: net, runningNet, grossToPar, netToPar };
       })
       .sort((a, b) => {
         const an = a.teamNet ?? Infinity;
@@ -563,9 +568,9 @@ export default function CalcuttaScoringPage() {
                         <p className="text-[10px] text-zinc-500 truncate">{r.playerA} · {r.playerB}</p>
                       )}
                     </div>
-                    <span className="text-sm text-zinc-400 w-12 text-right shrink-0">{r.teamGross ?? "—"}</span>
-                    <span className="text-sm font-bold text-emerald-400 w-12 text-right shrink-0">
-                      {r.teamNet ?? r.runningNet ?? "—"}
+                    <span className="text-sm text-zinc-400 w-12 text-right shrink-0">{fmtNet(r.grossToPar)}</span>
+                    <span className={`text-sm font-bold w-12 text-right shrink-0 ${r.netToPar != null && r.netToPar < 0 ? "text-red-400" : r.netToPar === 0 ? "text-emerald-400" : "text-white"}`}>
+                      {fmtNet(r.netToPar)}
                     </span>
                   </button>
                 );
