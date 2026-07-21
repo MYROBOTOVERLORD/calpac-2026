@@ -197,10 +197,72 @@ export const HILLS: CourseData = {
   ],
 };
 
+// ─── Fall Series courses ─────────────────────────────────────────────────────
+// Scorecard data from White (middle men's) tees. No hole photos are available
+// for these municipal courses; imageUrl is left blank and the scoring page
+// renders a gradient placeholder that keeps the Old Greenwood / Gray's Crossing
+// layout intact.
+
+export const BLUE_ROCK_EAST: CourseData = {
+  id: "blue-rock-east",
+  name: "Blue Rock Springs East",
+  shortName: "BRE",
+  par: 70,
+  holes: [
+    { hole: 1,  par: 4, handicap: 9,  tees: [{ name: "White", yardage: 343 }], imageUrl: "" },
+    { hole: 2,  par: 3, handicap: 17, tees: [{ name: "White", yardage: 141 }], imageUrl: "" },
+    { hole: 3,  par: 4, handicap: 7,  tees: [{ name: "White", yardage: 344 }], imageUrl: "" },
+    { hole: 4,  par: 4, handicap: 3,  tees: [{ name: "White", yardage: 358 }], imageUrl: "" },
+    { hole: 5,  par: 5, handicap: 1,  tees: [{ name: "White", yardage: 473 }], imageUrl: "" },
+    { hole: 6,  par: 3, handicap: 11, tees: [{ name: "White", yardage: 148 }], imageUrl: "" },
+    { hole: 7,  par: 5, handicap: 13, tees: [{ name: "White", yardage: 502 }], imageUrl: "" },
+    { hole: 8,  par: 3, handicap: 15, tees: [{ name: "White", yardage: 104 }], imageUrl: "" },
+    { hole: 9,  par: 4, handicap: 5,  tees: [{ name: "White", yardage: 367 }], imageUrl: "" },
+    { hole: 10, par: 4, handicap: 12, tees: [{ name: "White", yardage: 319 }], imageUrl: "" },
+    { hole: 11, par: 3, handicap: 16, tees: [{ name: "White", yardage: 130 }], imageUrl: "" },
+    { hole: 12, par: 4, handicap: 4,  tees: [{ name: "White", yardage: 342 }], imageUrl: "" },
+    { hole: 13, par: 4, handicap: 10, tees: [{ name: "White", yardage: 366 }], imageUrl: "" },
+    { hole: 14, par: 5, handicap: 18, tees: [{ name: "White", yardage: 542 }], imageUrl: "" },
+    { hole: 15, par: 4, handicap: 2,  tees: [{ name: "White", yardage: 406 }], imageUrl: "" },
+    { hole: 16, par: 3, handicap: 14, tees: [{ name: "White", yardage: 137 }], imageUrl: "" },
+    { hole: 17, par: 4, handicap: 6,  tees: [{ name: "White", yardage: 391 }], imageUrl: "" },
+    { hole: 18, par: 4, handicap: 8,  tees: [{ name: "White", yardage: 363 }], imageUrl: "" },
+  ],
+};
+
+export const SUNNYVALE: CourseData = {
+  id: "sunnyvale",
+  name: "Sunnyvale Golf Course",
+  shortName: "SUN",
+  par: 70,
+  holes: [
+    { hole: 1,  par: 4, handicap: 7,  tees: [{ name: "White", yardage: 351 }], imageUrl: "" },
+    { hole: 2,  par: 4, handicap: 5,  tees: [{ name: "White", yardage: 362 }], imageUrl: "" },
+    { hole: 3,  par: 5, handicap: 11, tees: [{ name: "White", yardage: 478 }], imageUrl: "" },
+    { hole: 4,  par: 3, handicap: 15, tees: [{ name: "White", yardage: 142 }], imageUrl: "" },
+    { hole: 5,  par: 4, handicap: 17, tees: [{ name: "White", yardage: 281 }], imageUrl: "" },
+    { hole: 6,  par: 4, handicap: 9,  tees: [{ name: "White", yardage: 354 }], imageUrl: "" },
+    { hole: 7,  par: 3, handicap: 13, tees: [{ name: "White", yardage: 129 }], imageUrl: "" },
+    { hole: 8,  par: 4, handicap: 1,  tees: [{ name: "White", yardage: 309 }], imageUrl: "" },
+    { hole: 9,  par: 4, handicap: 3,  tees: [{ name: "White", yardage: 402 }], imageUrl: "" },
+    { hole: 10, par: 5, handicap: 14, tees: [{ name: "White", yardage: 530 }], imageUrl: "" },
+    { hole: 11, par: 4, handicap: 8,  tees: [{ name: "White", yardage: 383 }], imageUrl: "" },
+    { hole: 12, par: 4, handicap: 18, tees: [{ name: "White", yardage: 362 }], imageUrl: "" },
+    { hole: 13, par: 3, handicap: 16, tees: [{ name: "White", yardage: 161 }], imageUrl: "" },
+    { hole: 14, par: 4, handicap: 12, tees: [{ name: "White", yardage: 342 }], imageUrl: "" },
+    { hole: 15, par: 3, handicap: 6,  tees: [{ name: "White", yardage: 171 }], imageUrl: "" },
+    { hole: 16, par: 4, handicap: 2,  tees: [{ name: "White", yardage: 306 }], imageUrl: "" },
+    { hole: 17, par: 4, handicap: 10, tees: [{ name: "White", yardage: 350 }], imageUrl: "" },
+    { hole: 18, par: 4, handicap: 4,  tees: [{ name: "White", yardage: 329 }], imageUrl: "" },
+  ],
+};
+
 export const COURSES: Record<string, CourseData> = {
   "old-greenwood": OLD_GREENWOOD,
   "grays-crossing": GRAYS_CROSSING,
   "hills": HILLS,
+  "blue-rock-east": BLUE_ROCK_EAST,
+  "sunnyvale": SUNNYVALE,
 };
 
 // Day 1 = Old Greenwood, Day 2 = Gray's Crossing

@@ -118,6 +118,12 @@ export default function Home() {
             🤑 Calcutta
           </button>
           <button
+            onClick={() => router.push("/fall")}
+            className="bg-white border border-sky-200 rounded-xl px-3 py-2 text-sm font-semibold text-amber-700 hover:bg-sky-50 transition-colors"
+          >
+            🍂 Fall Series
+          </button>
+          <button
             onClick={() => {
               const gid = players.find((p) => p.day1GroupId)?.day1GroupId ?? "";
               router.push(`/group/${gid}/admin`);
