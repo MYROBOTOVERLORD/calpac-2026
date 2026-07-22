@@ -27,7 +27,11 @@ type FallGroupDoc = {
   courseName?: string;
   scores?: Record<string, (number | null)[]>;
   handicaps?: Record<string, number | null>;
+  scoresLocked?: boolean;
 };
+
+type RowEdit = { name?: string; hcp?: string; moveToGid?: string };
+type AddDraft = { name: string; hcp: string; gid: string };
 
 function emptyScores(players: string[]) {
   const s: Record<string, (number | null)[]> = {};
@@ -44,6 +48,7 @@ function buildInitialDoc(roundKey: string, groupName: string, courseId: string |
     courseName,
     scores: {},
     handicaps: {},
+    scoresLocked: false,
     contest: { closestToPinByHole: {} },
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
@@ -73,12 +78,11 @@ export default function FallAdminPage() {
   const [initStatus, setInitStatus] = useState<string | null>(null);
   const [initLoading, setInitLoading] = useState(false);
 
-  // Roster drafts: { [groupId]: string[] }
-  const [rosterDrafts, setRosterDrafts] = useState<Record<string, string[]>>({});
-  const [rosterSaving, setRosterSaving] = useState<string | null>(null);
-  // Handicap drafts: { [groupId]: { [player]: string } }
-  const [hcpDrafts, setHcpDrafts] = useState<Record<string, Record<string, string>>>({});
-  const [hcpSaving, setHcpSaving] = useState<string | null>(null);
+  const [rowEdits, setRowEdits] = useState<Record<string, RowEdit>>({});
+  const [rowSaving, setRowSaving] = useState<string | null>(null);
+  const [rowError, setRowError] = useState<Record<string, string | null>>({});
+  const [addDrafts, setAddDrafts] = useState<Record<string, AddDraft>>({});
+  const [lockSaving, setLockSaving] = useState<string | null>(null);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => setAdminUser(u));
@@ -98,22 +102,7 @@ export default function FallAdminPage() {
     return () => unsub();
   }, [isAdmin]);
 
-  // Seed drafts when groups load (without clobbering active edits)
-  useEffect(() => {
-    for (const g of groups) {
-      if (!rosterDrafts[g.id]) {
-        setRosterDrafts((prev) => ({ ...prev, [g.id]: [...(g.players ?? [])] }));
-      }
-      if (!hcpDrafts[g.id]) {
-        const d: Record<string, string> = {};
-        for (const p of g.players ?? []) {
-          const v = g.handicaps?.[p];
-          d[p] = typeof v === "number" ? String(v) : "";
-        }
-        setHcpDrafts((prev) => ({ ...prev, [g.id]: d }));
-      }
-    }
-  }, [groups]); // eslint-disable-line react-hooks/exhaustive-deps
+  const rowKey = (gid: string, player: string) => `${gid}::${player}`;
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -166,74 +155,14 @@ export default function FallAdminPage() {
     }
   }
 
-  function setRosterSlot(groupId: string, idx: number, value: string) {
-    setRosterDrafts((prev) => {
-      const list = [...(prev[groupId] ?? [])];
-      list[idx] = value;
-      return { ...prev, [groupId]: list };
-    });
-  }
-
-  function addRosterSlot(groupId: string) {
-    setRosterDrafts((prev) => ({ ...prev, [groupId]: [...(prev[groupId] ?? []), ""] }));
-  }
-
-  function removeRosterSlot(groupId: string, idx: number) {
-    setRosterDrafts((prev) => {
-      const list = [...(prev[groupId] ?? [])];
-      list.splice(idx, 1);
-      return { ...prev, [groupId]: list };
-    });
-  }
-
-  async function saveRoster(groupId: string) {
-    const g = groups.find((x) => x.id === groupId);
-    if (!g) return;
-    const cleaned = (rosterDrafts[groupId] ?? []).map((p) => p.trim()).filter(Boolean);
-    // de-dupe, preserve order
-    const players = [...new Set(cleaned)];
-    // reconcile scores + handicaps by name
-    const newScores: Record<string, (number | null)[]> = {};
-    const newHandicaps: Record<string, number | null> = {};
-    for (const p of players) {
-      newScores[p] = Array.isArray(g.scores?.[p]) ? (g.scores![p] as (number | null)[]) : Array.from({ length: HOLE_COUNT }, () => null);
-      newHandicaps[p] = typeof g.handicaps?.[p] === "number" ? (g.handicaps![p] as number) : null;
-    }
-    setRosterSaving(groupId);
+  async function toggleLock(groupId: string, next: boolean) {
+    setLockSaving(groupId);
     try {
-      await updateDoc(doc(db, "fall", groupId), {
-        players,
-        scores: newScores,
-        handicaps: newHandicaps,
-        updatedAt: serverTimestamp(),
-      });
-      // sync hcp drafts to new roster
-      setHcpDrafts((prev) => {
-        const d: Record<string, string> = {};
-        for (const p of players) d[p] = typeof newHandicaps[p] === "number" ? String(newHandicaps[p]) : (prev[groupId]?.[p] ?? "");
-        return { ...prev, [groupId]: d };
-      });
+      await updateDoc(doc(db, "fall", groupId), { scoresLocked: next, updatedAt: serverTimestamp() });
     } catch (err) {
       console.error(err);
     } finally {
-      setRosterSaving(null);
-    }
-  }
-
-  async function saveHandicaps(groupId: string) {
-    const drafts = hcpDrafts[groupId] ?? {};
-    const patch: Record<string, number | null> = {};
-    for (const [player, raw] of Object.entries(drafts)) {
-      const n = Number(raw);
-      patch[player] = raw.trim() === "" ? null : Number.isFinite(n) ? n : null;
-    }
-    setHcpSaving(groupId);
-    try {
-      await updateDoc(doc(db, "fall", groupId), { handicaps: patch, updatedAt: serverTimestamp() });
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setHcpSaving(null);
+      setLockSaving(null);
     }
   }
 
@@ -247,6 +176,104 @@ export default function FallAdminPage() {
         contest: { closestToPinByHole: {} },
         updatedAt: serverTimestamp(),
       });
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  // Rename (in place) + move (across groups) + set handicap — mirrors tourney savePlayerEdits
+  async function savePlayerRow(groupId: string, player: string) {
+    const key = rowKey(groupId, player);
+    const edit = rowEdits[key] ?? {};
+    const src = groups.find((g) => g.id === groupId);
+    if (!src) return;
+
+    const newName = (edit.name ?? player).trim() || player;
+    const targetGid = edit.moveToGid && edit.moveToGid !== groupId ? edit.moveToGid : groupId;
+    const target = groups.find((g) => g.id === targetGid);
+    if (!target) return;
+
+    const hcpRaw = edit.hcp;
+    const existingHcp = typeof src.handicaps?.[player] === "number" ? (src.handicaps![player] as number) : null;
+    const hcpVal = hcpRaw === undefined ? existingHcp : hcpRaw.trim() === "" ? null : Number.isFinite(Number(hcpRaw)) ? Number(hcpRaw) : null;
+    const savedScores = Array.isArray(src.scores?.[player]) ? (src.scores![player] as (number | null)[]) : Array.from({ length: HOLE_COUNT }, () => null);
+
+    const collidesIn = (grp: FallGroupDoc, exclude: string) =>
+      (grp.players ?? []).some((p) => p.toLowerCase() === newName.toLowerCase() && p.toLowerCase() !== exclude.toLowerCase());
+
+    setRowSaving(key);
+    setRowError((prev) => ({ ...prev, [key]: null }));
+    try {
+      if (targetGid === groupId) {
+        // rename in place
+        if (newName.toLowerCase() !== player.toLowerCase() && collidesIn(src, player)) {
+          setRowError((prev) => ({ ...prev, [key]: `${newName} is already in this group.` }));
+          return;
+        }
+        const players = (src.players ?? []).map((p) => (p === player ? newName : p));
+        const scores = { ...(src.scores ?? {}) };
+        const handicaps = { ...(src.handicaps ?? {}) };
+        if (newName !== player) { delete scores[player]; delete handicaps[player]; }
+        scores[newName] = savedScores;
+        handicaps[newName] = hcpVal;
+        await updateDoc(doc(db, "fall", groupId), { players, scores, handicaps, updatedAt: serverTimestamp() });
+      } else {
+        // move to another group (same round)
+        if (collidesIn(target, "")) {
+          setRowError((prev) => ({ ...prev, [key]: `${newName} is already in ${target.groupName ?? target.id}.` }));
+          return;
+        }
+        // remove from source
+        const srcPlayers = (src.players ?? []).filter((p) => p !== player);
+        const srcScores = { ...(src.scores ?? {}) }; delete srcScores[player];
+        const srcHcps = { ...(src.handicaps ?? {}) }; delete srcHcps[player];
+        // add to target
+        const tgtPlayers = [...(target.players ?? []), newName];
+        const tgtScores = { ...(target.scores ?? {}), [newName]: savedScores };
+        const tgtHcps = { ...(target.handicaps ?? {}), [newName]: hcpVal };
+        await updateDoc(doc(db, "fall", groupId), { players: srcPlayers, scores: srcScores, handicaps: srcHcps, updatedAt: serverTimestamp() });
+        await updateDoc(doc(db, "fall", targetGid), { players: tgtPlayers, scores: tgtScores, handicaps: tgtHcps, updatedAt: serverTimestamp() });
+      }
+      setRowEdits((prev) => { const n = { ...prev }; delete n[key]; return n; });
+    } catch (err) {
+      setRowError((prev) => ({ ...prev, [key]: err instanceof Error ? err.message : "Save failed." }));
+    } finally {
+      setRowSaving(null);
+    }
+  }
+
+  async function deletePlayer(groupId: string, player: string) {
+    if (!confirm(`Remove ${player} from this group?`)) return;
+    const g = groups.find((x) => x.id === groupId);
+    if (!g) return;
+    const players = (g.players ?? []).filter((p) => p !== player);
+    const scores = { ...(g.scores ?? {}) }; delete scores[player];
+    const handicaps = { ...(g.handicaps ?? {}) }; delete handicaps[player];
+    try {
+      await updateDoc(doc(db, "fall", groupId), { players, scores, handicaps, updatedAt: serverTimestamp() });
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  async function addPlayer(roundKey: string) {
+    const draft = addDrafts[roundKey];
+    if (!draft) return;
+    const name = draft.name.trim();
+    const gid = draft.gid;
+    if (!name || !gid) return;
+    const g = groups.find((x) => x.id === gid);
+    if (!g) return;
+    if ((g.players ?? []).some((p) => p.toLowerCase() === name.toLowerCase())) return;
+    const hcpVal = draft.hcp.trim() === "" ? null : Number.isFinite(Number(draft.hcp)) ? Number(draft.hcp) : null;
+    try {
+      await updateDoc(doc(db, "fall", gid), {
+        players: [...(g.players ?? []), name],
+        scores: { ...(g.scores ?? {}), [name]: Array.from({ length: HOLE_COUNT }, () => null) },
+        handicaps: { ...(g.handicaps ?? {}), [name]: hcpVal },
+        updatedAt: serverTimestamp(),
+      });
+      setAddDrafts((prev) => ({ ...prev, [roundKey]: { name: "", hcp: "", gid } }));
     } catch (err) {
       console.error(err);
     }
@@ -291,7 +318,7 @@ export default function FallAdminPage() {
 
   return (
     <main className="min-h-screen bg-zinc-950 text-white pb-16">
-      <div className="max-w-lg mx-auto px-4 py-6">
+      <div className="max-w-2xl mx-auto px-4 py-6">
 
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
@@ -310,7 +337,7 @@ export default function FallAdminPage() {
           <h2 className="text-sm font-bold text-white mb-2">Series Setup</h2>
           <p className="text-xs text-zinc-400 mb-3">
             {allSeeded
-              ? "✓ Every round has a starter group. Add more groups or edit rosters below."
+              ? "✓ Every round has a starter group. Add more groups, players and handicaps below."
               : "Create a starter “Group A” for each of the 7 rounds. You can add players and more groups afterward."}
           </p>
           <button
@@ -327,10 +354,16 @@ export default function FallAdminPage() {
 
         {/* Per-round management */}
         {FALL_ROUNDS.map((round) => {
-          const roundGroups = groups.filter((g) => g.round === round.roundKey);
+          const roundGroups = groups.filter((g) => g.round === round.roundKey)
+            .sort((a, b) => (a.groupName ?? a.id).localeCompare(b.groupName ?? b.id));
           const course = round.courseId ? COURSES[round.courseId] : null;
+          const groupOptions = roundGroups.map((g) => ({ gid: g.id, name: g.groupName ?? g.id }));
+          const add = addDrafts[round.roundKey] ?? { name: "", hcp: "", gid: groupOptions[0]?.gid ?? "" };
+          // flatten players across the round's groups
+          const roster = roundGroups.flatMap((g) => (g.players ?? []).filter(Boolean).map((p) => ({ g, player: p })));
+
           return (
-            <div key={round.roundKey} className="mb-6">
+            <div key={round.roundKey} className="mb-8">
               <div className="flex items-center justify-between mb-2">
                 <div>
                   <p className="text-sm font-bold text-white">{round.label}</p>
@@ -350,92 +383,130 @@ export default function FallAdminPage() {
                 <p className="text-xs text-zinc-600 italic mb-2">No groups. Use “Initialize” above or “+ Group”.</p>
               )}
 
-              {roundGroups.map((g) => {
-                const roster = rosterDrafts[g.id] ?? [];
-                const hcpDraft = hcpDrafts[g.id] ?? {};
-                const savedPlayers = (g.players ?? []).filter(Boolean);
-                return (
-                  <div key={g.id} className="bg-zinc-900 rounded-2xl p-4 mb-3 border border-zinc-800">
-                    <div className="flex items-center justify-between mb-3">
-                      <p className="text-sm font-bold text-white">{g.groupName ?? g.id}</p>
-                      <button onClick={() => deleteGroup(g.id)} className="text-red-500 hover:text-red-400 text-xs">Delete</button>
-                    </div>
-
-                    {/* Roster */}
-                    <div className="mb-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <p className="text-xs font-bold text-zinc-400 uppercase tracking-wide">Roster</p>
-                        {rosterSaving === g.id && <span className="text-[10px] text-zinc-500">Saving…</span>}
-                      </div>
-                      <div className="space-y-2">
-                        {roster.map((name, idx) => (
-                          <div key={idx} className="flex gap-2">
-                            <input
-                              value={name}
-                              onChange={(e) => setRosterSlot(g.id, idx, e.target.value)}
-                              placeholder={`Player ${idx + 1}`}
-                              className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500"
-                            />
-                            <button onClick={() => removeRosterSlot(g.id, idx)} className="w-9 shrink-0 bg-zinc-800 hover:bg-zinc-700 text-zinc-500 hover:text-red-400 rounded-lg text-sm">✕</button>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="flex gap-2 mt-2">
-                        <button onClick={() => addRosterSlot(g.id)} className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-xl py-2 text-xs font-semibold transition-colors">+ Add Player</button>
-                        <button onClick={() => saveRoster(g.id)} disabled={rosterSaving === g.id} className="flex-1 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white rounded-xl py-2 text-xs font-semibold transition-colors">Save Roster</button>
-                      </div>
-                    </div>
-
-                    {/* Handicaps */}
-                    {savedPlayers.length > 0 && (
-                      <div className="mb-4">
-                        <p className="text-xs font-bold text-zinc-400 uppercase tracking-wide mb-2">Course Handicaps</p>
-                        <div className="space-y-2">
-                          {savedPlayers.map((player) => (
-                            <div key={player} className="flex items-center gap-2">
-                              <span className="text-sm text-zinc-300 flex-1 truncate">{player}</span>
-                              <input
-                                type="number"
-                                value={hcpDraft[player] ?? ""}
-                                onChange={(e) => setHcpDrafts((prev) => ({ ...prev, [g.id]: { ...(prev[g.id] ?? {}), [player]: e.target.value } }))}
-                                placeholder="Hcp"
-                                min={0}
-                                max={54}
-                                className="w-20 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-emerald-500"
-                              />
-                            </div>
-                          ))}
-                        </div>
-                        <button onClick={() => saveHandicaps(g.id)} disabled={hcpSaving === g.id} className="mt-2 w-full bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-zinc-300 rounded-xl py-2 text-xs font-semibold transition-colors">
-                          {hcpSaving === g.id ? "Saving…" : "Save Handicaps"}
+              {/* Group controls (lock / clear / delete) */}
+              {roundGroups.length > 0 && (
+                <div className="space-y-2 mb-3">
+                  {roundGroups.map((g) => {
+                    const holesDone = (g.players ?? []).reduce((acc, p) => acc + (g.scores?.[p] ?? []).filter((v) => typeof v === "number").length, 0);
+                    return (
+                      <div key={g.id} className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-semibold text-white flex-1 min-w-[8rem]">
+                          {g.groupName ?? g.id}
+                          {g.scoresLocked && <span className="ml-2 text-[10px] font-bold bg-yellow-900/50 text-yellow-400 px-2 py-0.5 rounded-full uppercase">🔒 Locked</span>}
+                          <span className="ml-2 text-[10px] text-zinc-500">{(g.players ?? []).filter(Boolean).length} players · {holesDone} scores</span>
+                        </span>
+                        <button
+                          onClick={() => toggleLock(g.id, !g.scoresLocked)}
+                          disabled={lockSaving === g.id}
+                          className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-50 ${g.scoresLocked ? "bg-zinc-700 hover:bg-zinc-600 text-zinc-200" : "bg-emerald-700 hover:bg-emerald-600 text-white"}`}
+                        >
+                          {lockSaving === g.id ? "…" : g.scoresLocked ? "Unlock" : "Lock"}
                         </button>
+                        <button onClick={() => clearScores(g.id)} className="rounded-lg px-3 py-1.5 text-xs font-semibold bg-zinc-800 hover:bg-red-900/40 text-red-400 border border-red-900/60">Clear</button>
+                        <button onClick={() => deleteGroup(g.id)} className="rounded-lg px-3 py-1.5 text-xs font-semibold bg-zinc-800 hover:bg-red-900/40 text-red-500">Delete</button>
                       </div>
-                    )}
+                    );
+                  })}
+                </div>
+              )}
 
-                    {/* Score progress */}
-                    {savedPlayers.length > 0 && (
-                      <div className="mb-3">
-                        <p className="text-xs font-bold text-zinc-400 uppercase tracking-wide mb-2">Score Progress</p>
-                        {savedPlayers.map((p) => {
-                          const played = (g.scores?.[p] ?? []).filter((v) => typeof v === "number").length;
-                          return (
-                            <div key={p} className="flex items-center justify-between text-xs py-1">
-                              <span className="text-zinc-300">{p}</span>
-                              <span className={played === 18 ? "text-emerald-400" : played > 0 ? "text-emerald-300" : "text-zinc-600"}>
-                                {played === 18 ? "✓ Complete" : played > 0 ? `${played}/18` : "No scores"}
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
+              {/* Players table */}
+              {roster.length > 0 && (
+                <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-x-auto mb-3">
+                  <table className="w-full min-w-[460px] text-xs">
+                    <thead>
+                      <tr className="text-left text-zinc-500">
+                        <th className="p-2 font-semibold">Player</th>
+                        <th className="p-2 font-semibold">Group</th>
+                        <th className="p-2 font-semibold w-14">HCP</th>
+                        <th className="p-2"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {roster.map(({ g, player }) => {
+                        const key = rowKey(g.id, player);
+                        const edit = rowEdits[key] ?? {};
+                        const nameVal = edit.name ?? player;
+                        const hcpVal = edit.hcp ?? (typeof g.handicaps?.[player] === "number" ? String(g.handicaps![player]) : "");
+                        const gidVal = edit.moveToGid ?? g.id;
+                        return (
+                          <tr key={key} className="border-t border-zinc-800">
+                            <td className="p-2">
+                              <input
+                                value={nameVal}
+                                onChange={(e) => setRowEdits((prev) => ({ ...prev, [key]: { ...(prev[key] ?? {}), name: e.target.value } }))}
+                                className="w-[12ch] px-2 py-1.5 bg-zinc-800 border border-zinc-700 rounded text-white focus:outline-none focus:border-emerald-500"
+                              />
+                            </td>
+                            <td className="p-2">
+                              <select
+                                value={gidVal}
+                                onChange={(e) => setRowEdits((prev) => ({ ...prev, [key]: { ...(prev[key] ?? {}), moveToGid: e.target.value } }))}
+                                className="px-2 py-1.5 bg-zinc-800 border border-zinc-700 rounded text-white focus:outline-none focus:border-emerald-500 max-w-[9rem]"
+                              >
+                                {groupOptions.map((o) => <option key={o.gid} value={o.gid}>{o.name}</option>)}
+                              </select>
+                            </td>
+                            <td className="p-2">
+                              <input
+                                value={hcpVal}
+                                onChange={(e) => setRowEdits((prev) => ({ ...prev, [key]: { ...(prev[key] ?? {}), hcp: e.target.value } }))}
+                                inputMode="numeric"
+                                className="w-12 px-2 py-1.5 bg-zinc-800 border border-zinc-700 rounded text-center text-white focus:outline-none focus:border-emerald-500"
+                              />
+                            </td>
+                            <td className="p-2 whitespace-nowrap">
+                              <div className="flex gap-1 justify-end">
+                                <button onClick={() => deletePlayer(g.id, player)} className="bg-zinc-800 hover:bg-red-900/40 text-red-400 border border-zinc-700 rounded px-2 py-1">Del</button>
+                                <button
+                                  onClick={() => savePlayerRow(g.id, player)}
+                                  disabled={rowSaving === key}
+                                  className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded px-2.5 py-1 font-semibold"
+                                >
+                                  {rowSaving === key ? "…" : "Save"}
+                                </button>
+                              </div>
+                              {rowError[key] && <p className="text-red-400 text-[10px] mt-1">{rowError[key]}</p>}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
 
-                    <button onClick={() => clearScores(g.id)} className="w-full border border-red-900 hover:bg-red-900/30 text-red-400 hover:text-red-300 rounded-xl py-2 text-xs font-semibold transition-colors">
-                      🗑 Clear All Scores
-                    </button>
-                  </div>
-                );
-              })}
+              {/* Add player */}
+              {groupOptions.length > 0 && (
+                <div className="flex flex-wrap gap-2 items-center">
+                  <input
+                    value={add.name}
+                    onChange={(e) => setAddDrafts((prev) => ({ ...prev, [round.roundKey]: { ...add, name: e.target.value } }))}
+                    placeholder="Add player name"
+                    className="flex-1 min-w-[10rem] bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500"
+                  />
+                  <input
+                    value={add.hcp}
+                    onChange={(e) => setAddDrafts((prev) => ({ ...prev, [round.roundKey]: { ...add, hcp: e.target.value } }))}
+                    placeholder="Hcp"
+                    inputMode="numeric"
+                    className="w-16 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white text-center placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500"
+                  />
+                  <select
+                    value={add.gid || groupOptions[0]?.gid}
+                    onChange={(e) => setAddDrafts((prev) => ({ ...prev, [round.roundKey]: { ...add, gid: e.target.value } }))}
+                    className="bg-zinc-900 border border-zinc-800 rounded-lg px-2 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 max-w-[9rem]"
+                  >
+                    {groupOptions.map((o) => <option key={o.gid} value={o.gid}>{o.name}</option>)}
+                  </select>
+                  <button
+                    onClick={() => addPlayer(round.roundKey)}
+                    className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg px-4 py-2 text-sm font-semibold transition-colors"
+                  >
+                    Add
+                  </button>
+                </div>
+              )}
             </div>
           );
         })}

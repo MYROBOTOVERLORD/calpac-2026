@@ -18,6 +18,7 @@ type FallGroupDoc = {
   courseName?: string;
   scores?: Record<string, (number | null)[]>;
   handicaps?: Record<string, number | null>;
+  scoresLocked?: boolean;
   contest?: { closestToPinByHole?: Record<string, ContestWinnerNote> };
 };
 
@@ -143,8 +144,8 @@ function DetailsPopup({ hole, course, onClose }: {
         </div>
 
         {hole.greenImageUrl || hole.imageUrl ? (
-          <div className="relative w-full aspect-[4/3] bg-zinc-800">
-            <img src={hole.greenImageUrl ?? hole.imageUrl} alt={`Hole ${hole.hole}`} className="w-full h-full object-contain" />
+          <div className="relative w-full bg-zinc-800 flex items-center justify-center max-h-[72vh] overflow-hidden">
+            <img src={hole.greenImageUrl ?? hole.imageUrl} alt={`Hole ${hole.hole}`} className="w-full h-auto max-h-[72vh] object-contain" />
           </div>
         ) : (
           <div className="relative w-full aspect-[4/3] bg-gradient-to-br from-emerald-900 via-zinc-900 to-zinc-950 flex items-center justify-center">
@@ -170,9 +171,10 @@ function DetailsPopup({ hole, course, onClose }: {
 
 // ─── Score Button ─────────────────────────────────────────────────────────────
 
-function ScoreButton({ value, par, onChange }: {
+function ScoreButton({ value, par, disabled, onChange }: {
   value: number | null;
   par: number;
+  disabled?: boolean;
   onChange: (v: number | null) => void;
 }) {
   const [editing, setEditing] = useState(false);
@@ -180,6 +182,7 @@ function ScoreButton({ value, par, onChange }: {
   const inputRef = useRef<HTMLInputElement>(null);
 
   function startEdit() {
+    if (disabled) return;
     setDraft(value !== null ? String(value) : "");
     setEditing(true);
     setTimeout(() => inputRef.current?.focus(), 50);
@@ -209,7 +212,7 @@ function ScoreButton({ value, par, onChange }: {
   return (
     <button
       onClick={startEdit}
-      className={`w-16 h-16 rounded-2xl flex flex-col items-center justify-center transition-all active:scale-95 ${getScoreColor(value, par)}`}
+      className={`w-16 h-16 rounded-2xl flex flex-col items-center justify-center transition-all active:scale-95 ${disabled ? "bg-zinc-800 text-zinc-600 cursor-not-allowed" : getScoreColor(value, par)}`}
     >
       <span className="text-2xl font-bold leading-none">{value !== null ? value : "–"}</span>
       {getScoreLabel(value, par) && (
@@ -305,7 +308,10 @@ export default function FallScoringPage() {
     }, 600);
   }
 
+  const locked = !!group?.scoresLocked;
+
   function handleScoreChange(player: string, holeIdx: number, value: number | null) {
+    if (locked) return;
     const nextScores = {
       ...scores,
       [player]: Array.from({ length: HOLE_COUNT }, (_, i) => (i === holeIdx ? value : (scores[player]?.[i] ?? null))),
@@ -315,6 +321,7 @@ export default function FallScoringPage() {
   }
 
   function updateCtpForHole(holeNumber: number, field: "winner" | "note", value: string) {
+    if (locked) return;
     const key = String(holeNumber);
     setCtpEdit((prev) => {
       const existing = prev[key] ?? { winner: "", note: "" };
@@ -436,7 +443,7 @@ export default function FallScoringPage() {
         {/* ── Hero Image ── */}
         <div className="relative w-full aspect-[16/9] bg-zinc-900 overflow-hidden">
           {h.imageUrl ? (
-            <img src={h.imageUrl} alt={`Hole ${h.hole} at ${course.name}`} className="w-full h-full object-cover" />
+            <img src={h.imageUrl} alt={`Hole ${h.hole} at ${course.name}`} className="w-full h-full object-cover object-top" />
           ) : (
             <div className="w-full h-full bg-gradient-to-br from-emerald-900 via-zinc-900 to-zinc-950 flex items-center justify-center">
               <p className="text-[10rem] font-black text-emerald-500/10 leading-none select-none">{h.hole}</p>
@@ -477,6 +484,11 @@ export default function FallScoringPage() {
 
         {/* ── Score Inputs ── */}
         <div className="px-4 pt-5 pb-2">
+          {locked && (
+            <div className="mb-3 bg-yellow-900/30 border border-yellow-800/40 rounded-xl px-3 py-2 text-xs text-yellow-400">
+              🔒 Scores are locked by admin
+            </div>
+          )}
           <div className="space-y-3">
             {players.map((player) => {
               const gross = scores[player]?.[currentHole] ?? null;
@@ -516,7 +528,7 @@ export default function FallScoringPage() {
                       ) : "—"}
                     </p>
                   </div>
-                  <ScoreButton value={gross} par={h.par} onChange={(v) => handleScoreChange(player, currentHole, v)} />
+                  <ScoreButton value={gross} par={h.par} disabled={locked} onChange={(v) => handleScoreChange(player, currentHole, v)} />
                   {holeStrokes > 0 && (
                     <div className={`w-10 h-10 rounded-xl flex flex-col items-center justify-center shrink-0 ${getScoreColor(netHole, h.par)}`}>
                       <span className="text-sm font-bold leading-none">{netHole ?? "—"}</span>

@@ -203,30 +203,32 @@ export const HILLS: CourseData = {
 // renders a gradient placeholder that keeps the Old Greenwood / Gray's Crossing
 // layout intact.
 
+const BRE_GREEN = (n: number) => `/greens/bre/hole-${n}.png`;
+
 export const BLUE_ROCK_EAST: CourseData = {
   id: "blue-rock-east",
   name: "Blue Rock Springs East",
   shortName: "BRE",
   par: 70,
   holes: [
-    { hole: 1,  par: 4, handicap: 9,  tees: [{ name: "White", yardage: 343 }], imageUrl: "" },
-    { hole: 2,  par: 3, handicap: 17, tees: [{ name: "White", yardage: 141 }], imageUrl: "" },
-    { hole: 3,  par: 4, handicap: 7,  tees: [{ name: "White", yardage: 344 }], imageUrl: "" },
-    { hole: 4,  par: 4, handicap: 3,  tees: [{ name: "White", yardage: 358 }], imageUrl: "" },
-    { hole: 5,  par: 5, handicap: 1,  tees: [{ name: "White", yardage: 473 }], imageUrl: "" },
-    { hole: 6,  par: 3, handicap: 11, tees: [{ name: "White", yardage: 148 }], imageUrl: "" },
-    { hole: 7,  par: 5, handicap: 13, tees: [{ name: "White", yardage: 502 }], imageUrl: "" },
-    { hole: 8,  par: 3, handicap: 15, tees: [{ name: "White", yardage: 104 }], imageUrl: "" },
-    { hole: 9,  par: 4, handicap: 5,  tees: [{ name: "White", yardage: 367 }], imageUrl: "" },
-    { hole: 10, par: 4, handicap: 12, tees: [{ name: "White", yardage: 319 }], imageUrl: "" },
-    { hole: 11, par: 3, handicap: 16, tees: [{ name: "White", yardage: 130 }], imageUrl: "" },
-    { hole: 12, par: 4, handicap: 4,  tees: [{ name: "White", yardage: 342 }], imageUrl: "" },
-    { hole: 13, par: 4, handicap: 10, tees: [{ name: "White", yardage: 366 }], imageUrl: "" },
-    { hole: 14, par: 5, handicap: 18, tees: [{ name: "White", yardage: 542 }], imageUrl: "" },
-    { hole: 15, par: 4, handicap: 2,  tees: [{ name: "White", yardage: 406 }], imageUrl: "" },
-    { hole: 16, par: 3, handicap: 14, tees: [{ name: "White", yardage: 137 }], imageUrl: "" },
-    { hole: 17, par: 4, handicap: 6,  tees: [{ name: "White", yardage: 391 }], imageUrl: "" },
-    { hole: 18, par: 4, handicap: 8,  tees: [{ name: "White", yardage: 363 }], imageUrl: "" },
+    { hole: 1,  par: 4, handicap: 9,  tees: [{ name: "White", yardage: 343 }], imageUrl: BRE_GREEN(1),  greenImageUrl: BRE_GREEN(1) },
+    { hole: 2,  par: 3, handicap: 17, tees: [{ name: "White", yardage: 141 }], imageUrl: BRE_GREEN(2),  greenImageUrl: BRE_GREEN(2) },
+    { hole: 3,  par: 4, handicap: 7,  tees: [{ name: "White", yardage: 344 }], imageUrl: BRE_GREEN(3),  greenImageUrl: BRE_GREEN(3) },
+    { hole: 4,  par: 4, handicap: 3,  tees: [{ name: "White", yardage: 358 }], imageUrl: BRE_GREEN(4),  greenImageUrl: BRE_GREEN(4) },
+    { hole: 5,  par: 5, handicap: 1,  tees: [{ name: "White", yardage: 473 }], imageUrl: BRE_GREEN(5),  greenImageUrl: BRE_GREEN(5) },
+    { hole: 6,  par: 3, handicap: 11, tees: [{ name: "White", yardage: 148 }], imageUrl: BRE_GREEN(6),  greenImageUrl: BRE_GREEN(6) },
+    { hole: 7,  par: 5, handicap: 13, tees: [{ name: "White", yardage: 502 }], imageUrl: BRE_GREEN(7),  greenImageUrl: BRE_GREEN(7) },
+    { hole: 8,  par: 3, handicap: 15, tees: [{ name: "White", yardage: 104 }], imageUrl: BRE_GREEN(8),  greenImageUrl: BRE_GREEN(8) },
+    { hole: 9,  par: 4, handicap: 5,  tees: [{ name: "White", yardage: 367 }], imageUrl: BRE_GREEN(9),  greenImageUrl: BRE_GREEN(9) },
+    { hole: 10, par: 4, handicap: 12, tees: [{ name: "White", yardage: 319 }], imageUrl: BRE_GREEN(10), greenImageUrl: BRE_GREEN(10) },
+    { hole: 11, par: 3, handicap: 16, tees: [{ name: "White", yardage: 130 }], imageUrl: BRE_GREEN(11), greenImageUrl: BRE_GREEN(11) },
+    { hole: 12, par: 4, handicap: 4,  tees: [{ name: "White", yardage: 342 }], imageUrl: BRE_GREEN(12), greenImageUrl: BRE_GREEN(12) },
+    { hole: 13, par: 4, handicap: 10, tees: [{ name: "White", yardage: 366 }], imageUrl: BRE_GREEN(13), greenImageUrl: BRE_GREEN(13) },
+    { hole: 14, par: 5, handicap: 18, tees: [{ name: "White", yardage: 542 }], imageUrl: BRE_GREEN(14), greenImageUrl: BRE_GREEN(14) },
+    { hole: 15, par: 4, handicap: 2,  tees: [{ name: "White", yardage: 406 }], imageUrl: BRE_GREEN(15), greenImageUrl: BRE_GREEN(15) },
+    { hole: 16, par: 3, handicap: 14, tees: [{ name: "White", yardage: 137 }], imageUrl: BRE_GREEN(16), greenImageUrl: BRE_GREEN(16) },
+    { hole: 17, par: 4, handicap: 6,  tees: [{ name: "White", yardage: 391 }], imageUrl: BRE_GREEN(17), greenImageUrl: BRE_GREEN(17) },
+    { hole: 18, par: 4, handicap: 8,  tees: [{ name: "White", yardage: 363 }], imageUrl: BRE_GREEN(18), greenImageUrl: BRE_GREEN(18) },
   ],
 };
 
